@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+group = 'dev.ame.zhnarrator'
+// The language pack loads this jar through jar-in-jar and asks for version 0.3.5 or newer.
+version = "${mod_version}+mc${minecraft_version}"
+base {
+    archivesName = 'learn-or-die-neoforge'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+neoForge {
+    version = neo_version
+
+    mods {
+        zhnarrator {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

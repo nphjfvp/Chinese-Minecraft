@@ -19,7 +19,7 @@ abstract class GuiItemIconMixin {
       cancellable = true
    )
    private void zhnarrator$drawCharactersInstead(@Nullable LivingEntity owner, @Nullable Level level, ItemStack stack, int x, int y, int seed, CallbackInfo ci) {
-      if (CharacterIcons.draw((GuiGraphicsExtractor)this, stack, x, y)) {
+      if (CharacterIcons.draw((GuiGraphicsExtractor)(Object)this, stack, x, y)) {
          ci.cancel();
       }
    }

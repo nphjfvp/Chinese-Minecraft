@@ -137,7 +137,7 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
 
    private OptionInstance<String> languageOption(List<String> languages, String current) {
       LanguagePacks packs = ZhNarratorClient.packs;
-      return new OptionInstance(
+      return new OptionInstance<>(
          "zhnarrator.options.language",
          OptionInstance.noTooltip(),
          (caption, v) -> Component.literal(packs.meta(v).map(LanguagePacks.Meta::label).orElse(v)),
@@ -157,7 +157,7 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
       values.add("auto");
       values.addAll(available);
       Map<String, String> names = Map.of("zh", "中文", "es", "Español", "de", "Deutsch", "pt", "Português", "ja", "日本語", "en", "English");
-      return new OptionInstance(
+      return new OptionInstance<>(
          "zhnarrator.options.hint_language",
          OptionInstance.noTooltip(),
          (caption, v) -> v.equals("auto") ? Component.translatable("zhnarrator.options.hint_language.auto") : Component.literal(names.getOrDefault(v, v)),
@@ -260,11 +260,11 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
 
    static OptionInstance<String> cycle(String key, List<String> values, String current, Consumer<String> set) {
       String initial = values.contains(current) ? current : values.getFirst();
-      return new OptionInstance(key, OptionInstance.noTooltip(), (caption, v) -> Component.literal(v), new Enum(values, Codec.STRING), initial, set::accept);
+      return new OptionInstance<>(key, OptionInstance.noTooltip(), (caption, v) -> Component.literal(v), new Enum(values, Codec.STRING), initial, set::accept);
    }
 
    static OptionInstance<Double> percent(String key, float current, Consumer<Float> set) {
-      return new OptionInstance(
+      return new OptionInstance<>(
          key,
          OptionInstance.noTooltip(),
          (caption, v) -> Component.literal(caption.getString() + ": " + Math.round(v * 100.0) + "%"),
@@ -277,11 +277,11 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
    static OptionInstance<Double> slider(String key, double min, double max, double step, float current, String unit, Consumer<Float> set) {
       int steps = (int)Math.round((max - min) / step);
       double initial = Math.clamp(Math.round((current - min) / step) * step + min, min, max);
-      return new OptionInstance(
+      return new OptionInstance<>(
          key,
          OptionInstance.noTooltip(),
          (caption, v) -> Component.literal(caption.getString() + ": " + format(v) + unit),
-         new IntRange(0, steps).xmap(i -> min + i * step, d -> (int)Math.round((d - min) / step), true),
+         new IntRange(0, steps).<Double>xmap(i -> min + i * step, d -> (int)Math.round((d - min) / step), true),
          initial,
          v -> set.accept(v.floatValue())
       );

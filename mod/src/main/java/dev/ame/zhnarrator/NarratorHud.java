@@ -64,9 +64,9 @@ public final class NarratorHud {
             float centerX = g.guiWidth() / 2.0F;
             int smallLines = (showPinyin ? 1 : 0) + (showEnglish ? 1 : 0);
             float blockHeight = (9 + 2) * scale + smallLines * (9 + 1) * small;
-            String pose = c.hudAnchor;
+            String anchor = c.hudAnchor;
 
-            float y = switch (pose) {
+            float y = switch (anchor) {
                case "top" -> c.hudOffset;
                case "fraction" -> g.guiHeight() * c.hudY;
                default -> g.guiHeight() - c.hudOffset - blockHeight;
