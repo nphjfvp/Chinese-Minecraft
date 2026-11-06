@@ -85,6 +85,10 @@ public final class NarratorConfig {
    public String newWorldLearning = "continue";
    /** Everything as bright as with night vision. */
    public boolean fullbright = false;
+   /** A hostile mob this close (blocks) stops the quiz; 0 turns it off. */
+   public float dangerDistance = 4.0F;
+   /** After danger (a mob close, damage) the quiz waits this long before the next question. */
+   public float dangerPauseSeconds = 10.0F;
    public boolean hudEnabled = true;
    public String hudFont = "default";
    public float hudScale = 2.0F;

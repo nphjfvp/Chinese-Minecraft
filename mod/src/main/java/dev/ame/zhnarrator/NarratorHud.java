@@ -308,7 +308,10 @@ public final class NarratorHud {
    private static NarratorHud.Line quizTimerLine(Minecraft mc) {
       NarratorConfig c = ZhNarratorClient.config;
       QuizManager quiz = ZhNarratorClient.quiz;
-      if (quiz != null && mc.player != null && c.enabled && !c.quizMode.equals("off") && !quiz.questionOpen()) {
+      long danger = quiz == null ? 0L : quiz.dangerLeftMs(System.currentTimeMillis());
+      if (quiz != null && mc.player != null && c.enabled && !c.quizMode.equals("off") && danger > 0L) {
+         return new NarratorHud.Line(Component.translatable("zhnarrator.timer.danger", new Object[]{(danger + 999L) / 1000L}), -30070);
+      } else if (quiz != null && mc.player != null && c.enabled && !c.quizMode.equals("off") && !quiz.questionOpen()) {
          long now = System.currentTimeMillis();
          VoiceHelper setup = ZhNarratorClient.voiceHelper;
          if (setup != null && setup.setupDone() > 20000000L) {

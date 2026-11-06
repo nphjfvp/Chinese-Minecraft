@@ -23,6 +23,7 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.GameShuttingDownEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
@@ -68,6 +69,12 @@ public final class NeoForgeEntry {
                if (Consequences.pledgeDeathDrops(player, stacks)) {
                   event.getDrops().clear();
                }
+            }
+         });
+         // Singleplayer: real damage (a skeleton's arrow, a fall …) stops the quiz.
+         game.addListener((LivingDamageEvent.Post event) -> {
+            if (event.getEntity() instanceof ServerPlayer player && event.getInflictedDamage() > 0.0F) {
+               Consequences.onPlayerDamaged(player, event.getSource());
             }
          });
          game.addListener((GameShuttingDownEvent event) -> ZhNarratorClient.stopping());

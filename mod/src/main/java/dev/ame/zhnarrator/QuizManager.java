@@ -80,6 +80,10 @@ public final class QuizManager {
    private volatile String micName = "";
    private String micAnnounced = "";
    private static final long BETWEEN_QUESTIONS_MS = 1500L;
+   /** No question before this time: a mob came close or the player got hurt. */
+   private long dangerUntil;
+   /** Set from the server thread when the player took real damage (singleplayer). */
+   private volatile boolean hurtPending;
 
    public QuizManager(PhraseBook phrases, Speaker speaker, Progress progress) {
       this.phrases = phrases;
@@ -142,8 +146,10 @@ public final class QuizManager {
             this.progress.addPlayTime(gap);
          }
 
-         if (this.lastHealth >= 0.0F && player.getHealth() < this.lastHealth - 0.5F) {
-            this.lastDamageAt = now;
+         boolean healthDropped = this.lastHealth >= 0.0F && player.getHealth() < this.lastHealth - 0.5F;
+         if (healthDropped && mc.getSingleplayerServer() == null) {
+            // On a server the cause is unknown here: any lost health counts as danger.
+            this.hurtPending = true;
          }
 
          this.lastHealth = player.getHealth();
@@ -163,8 +169,13 @@ public final class QuizManager {
             chat(mc, "§7Microphone: " + mic + " (change it in the settings, I)");
          }
          NarratorConfig c = ZhNarratorClient.config;
+         String danger = this.danger(mc, player, now);
+         if (danger != null) {
+            this.interrupt(mc, danger, now);
+         }
+
          if (this.suspended != null) {
-            if (mc.gui.screen() == null) {
+            if (mc.gui.screen() == null && now >= this.dangerUntil) {
                QuizManager.Suspended s = this.suspended;
                this.suspended = null;
                mc.gui.setScreen(new QuizScreen(this, s.question(), s.options(), (float)s.remainingMs() / 1000.0F, s.titleKey(), s.titleArg()));
@@ -174,7 +185,7 @@ public final class QuizManager {
          } else if (this.round != null) {
             if (player.isDeadOrDying()) {
                this.endRound(now);
-            } else if (this.pending == null && now >= this.nextStepAt && mc.gui.screen() == null) {
+            } else if (this.pending == null && now >= this.nextStepAt && now >= this.dangerUntil && mc.gui.screen() == null && this.safeToContinue(player, now)) {
                this.openStep(mc, now);
             }
          } else if (c.enabled && !c.quizMode.equals("off") && this.pending == null && mc.gui.screen() == null) {
@@ -187,7 +198,7 @@ public final class QuizManager {
                      this.lastQuizAt = now;
                   }
                }
-            } else if (!((float)(now - this.lastQuizAt) < c.quizIntervalSeconds * 1000.0F) && this.calmMoment(player, now)) {
+            } else if (!((float)(now - this.lastQuizAt) < c.quizIntervalSeconds * 1000.0F) && now >= this.dangerUntil && this.calmMoment(player, now)) {
                if (c.quizMode.equals("speech") && !this.helperUp) {
                   this.lastQuizAt = now - (long)(c.quizIntervalSeconds * 1000.0F) + 15000L;
                   VoiceHelper helper = ZhNarratorClient.voiceHelper;
@@ -550,11 +561,82 @@ public final class QuizManager {
       return this.waitReason(p, now) == null;
    }
 
+   /** The next question of a running round: like a calm moment, but standing still while answering is fine. */
+   private boolean safeToContinue(LocalPlayer p, long now) {
+      String reason = this.waitReason(p, now);
+      return reason == null || reason.equals("afk");
+   }
+
+   /** Called on the server thread when the local player took damage that is not from the quiz's own effects. */
+   public void onHurt() {
+      this.hurtPending = true;
+   }
+
+   /** Why the quiz has to stop right now, or null: the player got hurt, or a hostile mob is close. */
+   @Nullable
+   private String danger(Minecraft mc, LocalPlayer player, long now) {
+      if (this.hurtPending) {
+         this.hurtPending = false;
+         this.lastDamageAt = now;
+         return "you got hurt";
+      } else {
+         float reach = ZhNarratorClient.config.dangerDistance;
+         if (reach > 0.0F && mc.level != null) {
+            for (net.minecraft.world.entity.LivingEntity e : mc.level
+               .getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, player.getBoundingBox().inflate(reach), x -> x instanceof net.minecraft.world.entity.monster.Enemy && x.isAlive())) {
+               if (e.distanceTo(player) <= reach) {
+                  return e.getName().getString() + " nearby";
+               }
+            }
+         }
+
+         return null;
+      }
+   }
+
+   /**
+    * Stops the quiz for a while: an open question closes without counting (it comes again later, with
+    * its full time), and no question opens for {@code dangerPauseSeconds}. While the danger lasts, the
+    * pause keeps starting over.
+    */
+   private void interrupt(Minecraft mc, String why, long now) {
+      boolean asking = this.pending != null || this.suspended != null || mc.gui.screen() instanceof QuizScreen;
+      long pause = (long)(ZhNarratorClient.config.dangerPauseSeconds * 1000.0F);
+      this.dangerUntil = Math.max(this.dangerUntil, now + pause);
+      if (asking) {
+         if (this.phase == QuizManager.Phase.RECORDING) {
+            this.speech.stop(null, 0.0F).exceptionally(e -> null);
+         }
+
+         this.phase = QuizManager.Phase.NONE;
+         this.pending = null;
+         this.suspended = null;
+         this.heard = null;
+         this.heardError = null;
+         this.bestHeard = null;
+         if (mc.gui.screen() instanceof QuizScreen) {
+            mc.gui.setScreen(null);
+         }
+
+         if (this.round == null) {
+            this.lastQuizAt = now;
+         }
+
+         ZhNarratorClient.LOGGER.info("quiz paused: {}", why);
+         chat(mc, "§e⚠ Quiz paused: " + why + ". §7Get to safety; it goes on " + Math.round(pause / 1000.0F) + " s after the danger is gone.");
+      }
+   }
+
+   /** How long the quiz still waits after danger, in ms; 0 when it does not. */
+   public long dangerLeftMs(long now) {
+      return Math.max(0L, this.dangerUntil - now);
+   }
+
    @Nullable
    public String waitReason(LocalPlayer p, long now) {
       if (p.isDeadOrDying()) {
          return "dead";
-      } else if (now - this.lastDamageAt <= 5000L) {
+      } else if (now < this.dangerUntil || now - this.lastDamageAt <= 5000L) {
          return "hurt";
       } else if (p.isSleeping()) {
          return "sleep";

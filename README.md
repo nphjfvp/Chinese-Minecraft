@@ -59,6 +59,15 @@ Partikel (`glossary` am Ende von `phrases.json`).
 **Fullbright (Taste H).** Alles so hell wie mit Nachtsicht, nur auf deinem Rechner und ohne Effekt. Auch unter
 *Advanced settings* → *Fullbright*.
 
+**Bei Gefahr hört das Quiz auf.** Kommt ein feindlicher Mob näher als **4 Blöcke** oder bekommst du Schaden (ein
+Pfeil, ein Sturz, Lava …), schließt sich die offene Frage sofort, ohne als falsch zu zählen, und das Quiz pausiert.
+Weiter geht es erst **10 Sekunden, nachdem die Gefahr vorbei ist**, mit derselben Frage und voller Zeit. Oben links
+steht so lange „Quiz paused: get to safety“. Gift und Wither aus falschen Antworten und Hunger zählen nicht als Gefahr.
+In der Luft, im Wasser, beim Abbauen oder Reiten öffnet sich keine Frage, auch nicht mitten in einer Runde. Abstand
+und Pause stellst du unter *Advanced settings* ein (*Stop quiz: mob within N blocks*, 0 schaltet es ab;
+*Pause after danger*). Das Spiel selbst pausiert dabei nicht, weil Minecraft in der Pause auch die Stimme der Lehrerin
+anhält und die Hörfrage dann stumm wäre.
+
 **Gegenstände zurückverdienen (Pfand).** Leert die wütende Lehrerin dein Inventar oder stirbst du, kommen die
 Gegenstände ins Pfand der Welt, statt verloren zu gehen oder auf dem Boden zu liegen. **Jede richtige Frage gibt einen
 zufälligen Stapel zurück**; was nicht ins Inventar passt, landet vor deinen Füßen. Im Hardcore-Modus bleibt der Tod

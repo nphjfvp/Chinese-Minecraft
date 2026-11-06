@@ -66,6 +66,13 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
       this.list
          .addSmall(
             new OptionInstance[]{
+               slider("zhnarrator.options.danger_distance", 0.0, 16.0, 1.0, c.dangerDistance, "", v -> c.dangerDistance = v),
+               slider("zhnarrator.options.danger_pause", 0.0, 30.0, 1.0, c.dangerPauseSeconds, " s", v -> c.dangerPauseSeconds = v)
+            }
+         );
+      this.list
+         .addSmall(
+            new OptionInstance[]{
                OptionInstance.createBoolean("zhnarrator.options.quiz_listen", c.quizListen, v -> c.quizListen = v),
                OptionInstance.createBoolean("zhnarrator.options.quiz_tones", c.quizTones, v -> c.quizTones = v)
             }

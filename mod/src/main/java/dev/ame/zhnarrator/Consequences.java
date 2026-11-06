@@ -206,6 +206,23 @@ public final class Consequences {
       }
    }
 
+   /**
+    * Called on the server thread when a player took damage. Stops the quiz unless the damage is the
+    * quiz's own doing (poison and wither from wrong answers) or hunger.
+    */
+   public static void onPlayerDamaged(ServerPlayer p, net.minecraft.world.damagesource.DamageSource source) {
+      Minecraft mc = Minecraft.getInstance();
+      if (mc.player != null && p.getUUID().equals(mc.player.getUUID())) {
+         boolean ownEffects = source.is(net.minecraft.world.damagesource.DamageTypes.MAGIC)
+            || source.is(net.minecraft.world.damagesource.DamageTypes.WITHER)
+            || source.is(net.minecraft.world.damagesource.DamageTypes.STARVE);
+         QuizManager quiz = ZhNarratorClient.quiz;
+         if (!ownEffects && quiz != null) {
+            quiz.onHurt();
+         }
+      }
+   }
+
    /** A right answer gives one random stack back from the pledge. */
    static void returnPledged(Minecraft mc) {
       IntegratedServer server = mc.getSingleplayerServer();
