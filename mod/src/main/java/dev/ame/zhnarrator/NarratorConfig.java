@@ -76,8 +76,13 @@ public final class NarratorConfig {
    public boolean quizListen = true;
    /** A round asks the tone of one syllable of the word (Chinese). */
    public boolean quizTones = true;
-   /** Mastered words show no pinyin, in the narration (hold the pinyin key to see it) and in the quiz. */
-   public boolean pinyinFadeMastered = true;
+   /**
+    * The pinyin of a mastered word disappears (in the narration, where the pinyin key still shows it,
+    * and in the quiz) once it passed this many reviews; 0 keeps it always.
+    */
+   public int pinyinHideAfterReviews = 4;
+   /** New worlds: "continue" the learning of the other worlds, or start "fresh" from zero. */
+   public String newWorldLearning = "continue";
    /** Everything as bright as with night vision. */
    public boolean fullbright = false;
    public boolean hudEnabled = true;

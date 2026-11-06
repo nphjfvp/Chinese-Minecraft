@@ -29,9 +29,23 @@ Effekt**: positiv bei richtig, negativ bei falsch. Hör- und Tonfrage lassen sic
 unter den aktiven Wörtern häufiger dran. Bei beherrschten Wörtern rücken die Wiederholungen nicht weiter auseinander,
 solange die Töne noch wackeln. In der Lernübersicht sind solche Wörter mit **♪** markiert.
 
-**Pinyin wird weniger.** Bei beherrschten Wörtern zeigt der Satz unten nur noch Schriftzeichen; mit gedrückter rechter
-Shift-Taste siehst du das Pinyin trotzdem. Im Quiz stehen bei beherrschten Wörtern keine Pinyin-Hilfen unter den
-Antworten. Abschaltbar unter *No pinyin for mastered words*.
+**Pinyin verschwindet spät.** Erst wenn ein Wort beherrscht ist **und danach 4 Wiederholungen bestanden hat** (nach
+10 Minuten, 30 Minuten, 2 Stunden und 6 Stunden Spielzeit), zeigt der Satz unten nur noch Schriftzeichen; mit gedrückter
+rechter Shift-Taste siehst du das Pinyin trotzdem. Dann stehen auch im Quiz keine Pinyin-Hilfen mehr unter den
+Antworten. Eine falsche Wiederholung bringt das Pinyin zurück. Die Zahl stellst du unter *Advanced settings* →
+*Pinyin goes after N reviews* ein (0 = Pinyin immer).
+
+**Neue Welten: weiterlernen oder bei null anfangen.** Unter *New worlds* in den Einstellungen wählst du vor dem
+Erstellen einer Welt:
+
+- *continue learning* (Standard): Die neue Welt teilt den Lernstand mit deinen anderen Welten, also aktive und
+  beherrschte Wörter und Wiederholungen. Das Quiz darf sofort alles abfragen, was du in irgendeiner Welt gehört hast.
+- *start from zero*: Die Welt lernt für sich, mit eigenen Wörtern; das Quiz fragt nur, was du dort gehört hast.
+
+Die Wahl gilt für Welten, die du danach zum ersten Mal betrittst, und bleibt für jede Welt fest. Welten von vorher
+teilen den Lernstand. Die Einstellungen erreichst du im Hauptmenü über *Mods* → *Learn or Die* → *Config*. Was die
+aktuelle Welt macht, steht oben in der Lernübersicht (Taste J). Pfand, Tode und die Statistik pro Satz gehören immer zur
+einzelnen Welt.
 
 **Lernübersicht (Taste J).** Drei Spalten: die Wörter, die du gerade lernst, mit ihrer Serie (●○ = 1 von 2 guten
 Runden), die beherrschten Wörter mit der nächsten Wiederholung („due“ = fällig) und der Inhalt des Pfands mit Bildern.
@@ -84,8 +98,8 @@ Spitzhacke …). Das Quiz fragt aber nur eine feste Zahl von Wörtern ab, standa
 Wurde nichts gehört, steht dort auch, wie laut es am lautesten war; bei 0 % kommt vom Mikrofon nichts an.
 
 **Einstellungen** (Taste I): *Words learned at once* (Wörter gleichzeitig), *Pause between sentences* (Satzpause) und
-*Microphone* stehen im Hauptmenü, *Mastered after N good rounds* (gute Runden bis „beherrscht“), *Angry after N
-failed rounds*, *Death: items to the pledge*, *Listening question*, *Tone question*, *No pinyin for mastered words*
+*Microphone*, *New worlds* stehen im Hauptmenü, *Mastered after N good rounds* (gute Runden bis „beherrscht“), *Angry after N
+failed rounds*, *Death: items to the pledge*, *Listening question*, *Tone question*, *Pinyin goes after N reviews*
 und *Fullbright* unter *Advanced settings*. Die Tasten (J Übersicht, U Satzverlauf, H Fullbright) lassen sich unter Optionen →
 Steuerung → Tastenbelegung ändern. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
 words“, „Re-ask after“, „Quiet after correct“ und „Angry after N wrong“ gibt es nicht mehr, weil das neue System sie ersetzt.

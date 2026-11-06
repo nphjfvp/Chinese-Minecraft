@@ -58,7 +58,9 @@ class LearningTest {
             break;
          }
          if (!PhraseBook.isFragment(p) && !this.heardCards.containsKey(Progress.cardKey(p))) {
-            this.progress.world().heard.put(p.id(), 100 - this.heardCards.size());
+            for (int n = 0; n < 100 - this.heardCards.size(); n++) {
+               this.progress.heard(p.id());
+            }
             this.heardCards.put(Progress.cardKey(p), p);
          }
       }
@@ -72,7 +74,7 @@ class LearningTest {
 
    private Set<String> activeCards() {
       Set<String> active = new HashSet<>();
-      this.progress.cards.forEach((key, card) -> {
+      this.progress.cards().forEach((key, card) -> {
          if (!card.mastered) {
             active.add(key);
          }

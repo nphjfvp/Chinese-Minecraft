@@ -51,10 +51,10 @@ public final class QuizScreen extends Screen {
       return this.height / 2 + 2 + i / 2 * 44;
    }
 
-   /** Pinyin under the answers, except for mastered words: then the characters have to be read. */
+   /** Pinyin under the answers, except for well known words: then the characters have to be read. */
    private boolean showReadings() {
       return this.question.hasReading()
-         && !(ZhNarratorClient.config.pinyinFadeMastered && ZhNarratorClient.progress.isMastered(Progress.cardKey(this.question)));
+         && !ZhNarratorClient.progress.pinyinHidden(Progress.cardKey(this.question));
    }
 
    private Component reading(Phrase option) {

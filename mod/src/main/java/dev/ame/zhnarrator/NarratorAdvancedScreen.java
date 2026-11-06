@@ -73,7 +73,7 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
       this.list
          .addSmall(
             new OptionInstance[]{
-               OptionInstance.createBoolean("zhnarrator.options.pinyin_fade", c.pinyinFadeMastered, v -> c.pinyinFadeMastered = v),
+               slider("zhnarrator.options.pinyin_hide", 0.0, 6.0, 1.0, c.pinyinHideAfterReviews, "", v -> c.pinyinHideAfterReviews = Math.round(v)),
                OptionInstance.createBoolean("zhnarrator.options.fullbright", c.fullbright, v -> c.fullbright = v)
             }
          );

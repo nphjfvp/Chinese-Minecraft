@@ -58,7 +58,7 @@ public final class NarratorHud {
             Component pinyin = Component.literal(p.reading()).withStyle(style);
             Component en = Component.literal(p.en()).withStyle(style);
             // Mastered words lose their pinyin, so that the characters get read; the pinyin key still shows it.
-            boolean faded = c.pinyinFadeMastered && ZhNarratorClient.progress != null && ZhNarratorClient.progress.isMastered(Progress.cardKey(p));
+            boolean faded = ZhNarratorClient.progress != null && ZhNarratorClient.progress.pinyinHidden(Progress.cardKey(p));
             boolean showPinyin = p.hasReading()
                && (c.hudShowPinyin && !faded || ZhNarratorClient.keyPinyin != null && ZhNarratorClient.keyPinyin.isDown());
             boolean showEnglish = c.hudShowEnglish && !p.action().equals("hold") && !p.en().equals(p.text());
@@ -337,7 +337,7 @@ public final class NarratorHud {
                   ? new NarratorHud.Line(Component.translatable("zhnarrator.timer.helper_starting"), -14467)
                   : new NarratorHud.Line(Component.translatable("zhnarrator.timer.helper"), -30070);
             }
-         } else if (ZhNarratorClient.progress.world().heard.isEmpty()) {
+         } else if (ZhNarratorClient.progress.heardForQuiz().isEmpty()) {
             return new NarratorHud.Line(Component.translatable("zhnarrator.timer.first"), -14467);
          } else if (quiz.nothingToAsk()) {
             return new NarratorHud.Line(Component.translatable("zhnarrator.timer.nothing"), -14467);

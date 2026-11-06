@@ -39,7 +39,7 @@ public final class LearningScreen extends Screen {
       this.active.clear();
       this.mastered.clear();
 
-      for (Map.Entry<String, Progress.Card> e : progress.cards.entrySet()) {
+      for (Map.Entry<String, Progress.Card> e : progress.cards().entrySet()) {
          (e.getValue().mastered ? this.mastered : this.active).add(e);
       }
 
@@ -75,7 +75,14 @@ public final class LearningScreen extends Screen {
       int top = 34;
       int bottom = this.height - 12;
       int x0 = (this.width - (3 * colW + 2 * gap)) / 2;
-      g.centeredText(this.font, this.title.getString(), this.width / 2, 12, GOLD);
+      g.centeredText(this.font, this.title.getString(), this.width / 2, 8, GOLD);
+      g.centeredText(
+         this.font,
+         Component.translatable(ZhNarratorClient.progress.sharedLearning() ? "zhnarrator.overview.shared" : "zhnarrator.overview.own").getString(),
+         this.width / 2,
+         19,
+         GREY
+      );
       long play = ZhNarratorClient.progress.playMs;
       int due = 0;
 

@@ -91,7 +91,7 @@ public final class QuizManager {
       long now = System.currentTimeMillis();
       this.lastQuizAt = now;
       this.lastTickAt = now;
-      this.nothingToAsk = this.progress.world().heard.isEmpty();
+      this.nothingToAsk = this.progress.heardForQuiz().isEmpty();
       this.lastPickTryAt = 0L;
       this.pending = null;
       this.phase = QuizManager.Phase.NONE;
@@ -608,11 +608,11 @@ public final class QuizManager {
 
    /** Phrases that can be asked in this world (heard here, whole sentences), grouped by word. */
    private Map<String, List<Phrase>> askableByCard() {
-      Progress.World world = this.progress.world();
+      Map<String, Integer> heard = this.progress.heardForQuiz();
       Map<String, List<Phrase>> byCard = new HashMap<>();
 
       for (Phrase p : this.phrases.all()) {
-         if (!PhraseBook.isFragment(p) && world.heard.getOrDefault(p.id(), 0) > 0) {
+         if (!PhraseBook.isFragment(p) && heard.getOrDefault(p.id(), 0) > 0) {
             byCard.computeIfAbsent(Progress.cardKey(p), k -> new ArrayList<>()).add(p);
          }
       }
@@ -622,13 +622,13 @@ public final class QuizManager {
 
    /** Adds new words to learn until the configured number is reached, and tells the player about them. */
    private void fillActive(Map<String, List<Phrase>> askable) {
-      Progress.World world = this.progress.world();
+      Map<String, Integer> heardMap = this.progress.heardForQuiz();
       Map<String, Integer> heardByCard = new HashMap<>();
       askable.forEach((key, list) -> {
          int heard = 0;
 
          for (Phrase p : list) {
-            heard += world.heard.getOrDefault(p.id(), 0);
+            heard += heardMap.getOrDefault(p.id(), 0);
          }
 
          heardByCard.put(key, heard);
@@ -736,7 +736,7 @@ public final class QuizManager {
       for (Phrase p : list) {
          int asked = this.progress.asked(p.id());
          int wrong = asked - this.progress.correct(p.id());
-         double w = (1.0 + wrong * 2) / (1.0 + this.progress.correct(p.id())) * Math.min(world.heard.getOrDefault(p.id(), 1), 5);
+         double w = (1.0 + wrong * 2) / (1.0 + this.progress.correct(p.id())) * Math.min(this.progress.heardForQuiz().getOrDefault(p.id(), 1), 5);
          all.phrases().add(p);
          all.weights().add(w);
          if (this.progress.sinceAskedMs(p.id(), now) >= retryMs) {

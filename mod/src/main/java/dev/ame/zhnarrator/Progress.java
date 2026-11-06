@@ -26,6 +26,12 @@ public final class Progress {
    public Map<String, Progress.Card> cards = new HashMap<>();
    /** Time spent playing, in ms. Review intervals count only this time. */
    public long playMs;
+   /** Phrases heard in any world; worlds that continue the shared learning ask about these. */
+   public Map<String, Integer> heardEver = new HashMap<>();
+   /** A world that continues the learning of the other worlds. */
+   public static final String SHARED = "shared";
+   /** A world that starts learning from zero, with its own words. */
+   public static final String OWN = "own";
    private transient Progress.World current = new Progress.World();
    private transient Path file;
    private transient boolean dirty;
@@ -63,6 +69,18 @@ public final class Progress {
          p.cards = new HashMap<>();
       }
 
+      if (p.heardEver == null) {
+         p.heardEver = new HashMap<>();
+
+         Map<String, Integer> ever = p.heardEver;
+
+         for (Progress.World w : p.worlds.values()) {
+            if (w.heard != null) {
+               w.heard.forEach((id, n) -> ever.merge(id, n, Integer::sum));
+            }
+         }
+      }
+
       p.current = new Progress.World();
       p.file = file;
       p.lastAskedAt = new HashMap<>();
@@ -70,7 +88,17 @@ public final class Progress {
    }
 
    public void switchWorld(String key) {
+      boolean fresh = !this.worlds.containsKey(key);
       this.current = this.worlds.computeIfAbsent(key, k -> new Progress.World());
+      if (fresh) {
+         // A new world takes the choice from the settings; older worlds keep sharing.
+         this.current.learning = "fresh".equals(ZhNarratorClient.config.newWorldLearning) ? OWN : SHARED;
+      }
+
+      if (this.current.cards == null) {
+         this.current.cards = new HashMap<>();
+      }
+
       if (this.current.pledge == null) {
          this.current.pledge = new java.util.ArrayList<>();
       }
@@ -86,6 +114,7 @@ public final class Progress {
 
    public void heard(String id) {
       this.current.heard.merge(id, 1, Integer::sum);
+      this.heardEver.merge(id, 1, Integer::sum);
       this.dirty = true;
    }
 
@@ -114,7 +143,7 @@ public final class Progress {
    }
 
    private boolean updateCard(Phrase p, boolean correct) {
-      Progress.Card card = this.cards.get(cardKey(p));
+      Progress.Card card = this.cards().get(cardKey(p));
       if (card == null) {
          return false;
       } else if (!card.mastered) {
@@ -139,6 +168,31 @@ public final class Progress {
       }
    }
 
+   /** Whether this world continues the learning of the other worlds (or starts from zero). */
+   public boolean sharedLearning() {
+      return !OWN.equals(this.current.learning);
+   }
+
+   /** The learning cards of this world: the shared ones, or the world's own. */
+   public Map<String, Progress.Card> cards() {
+      return this.sharedLearning() ? this.cards : this.current.cards;
+   }
+
+   /** What the quiz may ask about: everything ever heard when sharing, else what was heard in this world. */
+   public Map<String, Integer> heardForQuiz() {
+      return this.sharedLearning() ? this.heardEver : this.current.heard;
+   }
+
+   /**
+    * Whether the pinyin of this word is hidden: only once it is mastered and has passed the configured
+    * number of reviews. A wrong review brings the pinyin back.
+    */
+   public boolean pinyinHidden(String key) {
+      int after = ZhNarratorClient.config.pinyinHideAfterReviews;
+      Progress.Card card = this.cards().get(key);
+      return after > 0 && card != null && card.mastered && card.level >= after;
+   }
+
    /** The word a phrase teaches: its item, block or creature, or the phrase itself (walk, jump …). */
    public static String cardKey(Phrase p) {
       if (p.key() != null) {
@@ -155,7 +209,7 @@ public final class Progress {
     * Words with tone trouble are asked more often and their reviews do not move further apart.
     */
    public void toneResult(Phrase p, boolean right) {
-      Progress.Card card = this.cards.get(cardKey(p));
+      Progress.Card card = this.cards().get(cardKey(p));
       if (card != null) {
          card.toneTrouble = right ? Math.max(0, card.toneTrouble - 1) : Math.min(5, card.toneTrouble + 1);
          this.dirty = true;
@@ -164,24 +218,24 @@ public final class Progress {
 
    @org.jetbrains.annotations.Nullable
    public Progress.Card card(String key) {
-      return this.cards.get(key);
+      return this.cards().get(key);
    }
 
    /** True while the word of this phrase is one of the words being learned right now. */
    public boolean isActive(Phrase p) {
-      Progress.Card card = this.cards.get(cardKey(p));
+      Progress.Card card = this.cards().get(cardKey(p));
       return card != null && !card.mastered;
    }
 
    public boolean isMastered(String key) {
-      Progress.Card card = this.cards.get(key);
+      Progress.Card card = this.cards().get(key);
       return card != null && card.mastered;
    }
 
    public int masteredCount() {
       int n = 0;
 
-      for (Progress.Card card : this.cards.values()) {
+      for (Progress.Card card : this.cards().values()) {
          if (card.mastered) {
             n++;
          }
@@ -199,7 +253,7 @@ public final class Progress {
       List<String> fresh = new java.util.ArrayList<>();
 
       for (String key : heardByCard.keySet()) {
-         Progress.Card card = this.cards.get(key);
+         Progress.Card card = this.cards().get(key);
          if (card == null) {
             fresh.add(key);
          } else if (!card.mastered) {
@@ -217,7 +271,7 @@ public final class Progress {
 
          Progress.Card card = new Progress.Card();
          card.since = this.playMs;
-         this.cards.put(key, card);
+         this.cards().put(key, card);
          added.add(key);
          active++;
       }
@@ -361,5 +415,9 @@ public final class Progress {
       public int heartsLost;
       public int deaths;
       public List<String> pledge = new java.util.ArrayList<>();
+      /** {@link Progress#SHARED} or {@link Progress#OWN}; empty in worlds from before the choice (shared). */
+      public String learning;
+      /** The cards of a world that learns on its own. */
+      public Map<String, Progress.Card> cards = new HashMap<>();
    }
 }

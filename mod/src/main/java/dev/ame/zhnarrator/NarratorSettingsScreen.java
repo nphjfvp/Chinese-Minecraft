@@ -113,6 +113,7 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
             );
          this.list.addBig(this.voiceButton());
          this.list.addBig(this.microphoneOption());
+         this.list.addBig(this.newWorldOption());
          this.list
             .addSmall(
                new OptionInstance[]{
@@ -178,6 +179,19 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
                this.minecraft.reloadResourcePacks();
             }
          }
+      );
+   }
+
+   /** Whether a new world continues the learning of the other worlds or starts from zero. */
+   private OptionInstance<String> newWorldOption() {
+      NarratorConfig c = ZhNarratorClient.config;
+      return new OptionInstance<>(
+         "zhnarrator.options.new_world",
+         OptionInstance.noTooltip(),
+         (caption, v) -> Component.translatable("options.generic_value", new Object[]{caption, Component.translatable("zhnarrator.options.new_world." + v)}),
+         new Enum(List.of("continue", "fresh"), Codec.STRING),
+         "fresh".equals(c.newWorldLearning) ? "fresh" : "continue",
+         v -> c.newWorldLearning = v
       );
    }
 
