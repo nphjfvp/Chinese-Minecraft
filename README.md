@@ -9,14 +9,35 @@ dich danach ab. Richtige Antworten bringen Buffs, falsche Debuffs.
 
 ## Was diese Version anders macht
 
+**Eine Quiz-Runde hat bis zu 4 Fragen zu einem Satz**, zum Beispiel 我在挖泥土 („I am digging the dirt“):
+
+1. **Satzanfang:** Welcher Anfang passt? 我在挖… / 我捡到… / 我在放… / 我扔了…
+2. **Wort:** Was heißt *dirt*? 泥土 und drei andere Wörter. Bei Sätzen ohne Gegenstand (laufen, springen) wird das
+   Verb gefragt: 我在 … *走路*.
+3. **Ganzer Satz:** wie bisher.
+4. **Sprechen:** den ganzen Satz sagen. Nur wenn das Hilfsprogramm für Sprachantworten läuft und der Quizmodus nicht
+   *choice* ist.
+
+Fehlt einem Satz ein Teil (etwa „下雨了“, der mit dem Verb beginnt), fällt die Frage weg. **Jede Frage gibt einen
+Effekt**: positiv bei richtig, negativ bei falsch.
+
+**Gegenstände zurückverdienen (Pfand).** Leert die wütende Lehrerin dein Inventar oder stirbst du, kommen die
+Gegenstände ins Pfand der Welt, statt verloren zu gehen oder auf dem Boden zu liegen. **Jede richtige Frage gibt einen
+zufälligen Stapel zurück**; was nicht ins Inventar passt, landet vor deinen Füßen. Im Hardcore-Modus bleibt der Tod
+das Ende. Beim Tod lässt sich das Pfand unter *Advanced settings* → *Death: items to the pledge* abschalten.
+
+**Die wütende Lehrerin** wird nach **2 verpatzten Runden hintereinander** wütend (Fragen 1–3 nicht alle richtig) und
+nimmt das Inventar ins Pfand.
+
 **Das Quiz lernt nur wenige Wörter auf einmal.** Am Anfang hörst du sehr viel (laufen, schwimmen, Erde, Holz,
 Spitzhacke …). Das Quiz fragt aber nur eine feste Zahl von Wörtern ab, standardmäßig 5.
 
 - Ein Wort ist ein Gegenstand, Block oder Mob (Erde, Eichenbretter, Zombie …) oder eine Tätigkeit ohne Gegenstand
   (laufen, sprinten, springen). Zu „Erde“ kann jeder gehörte Satz mit Erde abgefragt werden.
 - Neue Wörter sind die, die du im Spiel am häufigsten gehört hast. Im Chat steht dann „★ New word to learn: …“.
-- Nach **2 richtigen Antworten hintereinander** ist ein Wort beherrscht („New word learned“), und das nächste Wort rückt
-  nach. Eine falsche Antwort setzt die Serie zurück.
+- Nach **2 Runden hintereinander, in denen die Fragen 1–3 richtig waren,** ist ein Wort beherrscht („New word
+  learned“), und das nächste Wort rückt nach. Eine verpatzte Runde setzt die Serie zurück. Das Sprechen zählt hier
+  nicht mit, weil die Spracherkennung danebenliegen kann; es gibt nur seinen Effekt.
 - Beherrschte Wörter kommen mit **Spaced Repetition** wieder: nach 10 Minuten, 30 Minuten, 2 Stunden, 6 Stunden,
   1 Tag, 3 Tagen und dann 1 Woche **Spielzeit**. Eine fällige Wiederholung kommt vor den neuen Wörtern dran. Wer sie
   falsch beantwortet, fängt wieder bei 10 Minuten an.
@@ -31,10 +52,14 @@ Spitzhacke …). Das Quiz fragt aber nur eine feste Zahl von Wörtern ab, standa
   was du in diesem Moment tust; bei mehreren Ereignissen das, das du am seltensten gehört hast.
 - Antworten im Quiz (richtig, falsch, wütend) kommen sofort, ohne Pause.
 
-**Einstellungen** (Taste I): *Words learned at once* (Wörter gleichzeitig) und *Pause between sentences* (Satzpause)
-stehen im Hauptmenü, *Mastered after N right in a row* (richtige Antworten bis „beherrscht“) unter *Advanced
-settings*. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
-words“, „Re-ask after“ und „Quiet after correct“ gibt es nicht mehr, weil das neue System sie ersetzt.
+**Mikrofon auswählen.** Unter *Microphone* in den Einstellungen stehen alle Mikrofone, die das Hilfsprogramm findet
+(es muss dafür laufen), sonst nimmt es das Standard-Mikrofon des Systems. Im Chat steht, welches Mikrofon aufnimmt.
+Wurde nichts gehört, steht dort auch, wie laut es am lautesten war; bei 0 % kommt vom Mikrofon nichts an.
+
+**Einstellungen** (Taste I): *Words learned at once* (Wörter gleichzeitig), *Pause between sentences* (Satzpause) und
+*Microphone* stehen im Hauptmenü, *Mastered after N good rounds* (gute Runden bis „beherrscht“), *Angry after N
+failed rounds* und *Death: items to the pledge* unter *Advanced settings*. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
+words“, „Re-ask after“, „Quiet after correct“ und „Angry after N wrong“ gibt es nicht mehr, weil das neue System sie ersetzt.
 
 ## Lizenz
 
@@ -123,9 +148,10 @@ dekompiliert. Die Namen sind echt, Kommentare gibt es aber keine. Die wichtigste
 | Klasse | Aufgabe |
 |---|---|
 | `ActionDetector` | Erkennt, was du tust (laufen, abbauen, essen, kämpfen …), und wählt den passenden Satz. |
-| `QuizManager` | Wann und was abgefragt wird, wann ein Wort als gelernt gilt. |
+| `QuizManager` | Wann und was abgefragt wird, der Ablauf einer Runde, wann ein Wort als gelernt gilt. |
+| `QuizRound` | Baut die Runde: Satzanfang, Wort, ganzer Satz, Sprechen, mit den falschen Antworten. |
 | `QuizScreen` | Das Abfragefenster mit den vier Antworten. |
-| `Consequences` | Belohnungen und Strafen (Effekte, wütende Lehrerin). |
+| `Consequences` | Belohnungen und Strafen (Effekte, wütende Lehrerin) und das Pfand. |
 | `NarratorHud` | Der Satz auf dem Bildschirm mit Pinyin und Englisch. |
 | `NarratorConfig` | Alle Einstellungen mit ihren Standardwerten. |
 | `PhraseBook`, `LanguagePacks` | Laden `phrases.json`. |
@@ -134,7 +160,7 @@ dekompiliert. Die Namen sind echt, Kommentare gibt es aber keine. Die wichtigste
 | `VoiceHelper`, `SpeechClient` | Antworten per Mikrofon (Hilfsprogramm in `src/main/resources/zhnarrator_voicehelper/`). |
 
 Der Build (`mod/build.gradle`) nutzt NeoForge 26.3.0.99 mit ModDevGradle. Die Tests in `mod/src/test/` prüfen die
-Quiz-Auswahl, Spaced Repetition und die Sprechpausen mit der echten `phrases.json`. `tools/build_jar.py` baut die
+Quiz-Auswahl, den Aufbau der Runden, Spaced Repetition, das Pfand und die Sprechpausen mit der echten `phrases.json`. `tools/build_jar.py` baut die
 übersetzte Datei aus `mod/build/libs/` automatisch in die Mod ein.
 
 ## Credits

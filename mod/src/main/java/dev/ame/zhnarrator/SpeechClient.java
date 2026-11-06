@@ -10,6 +10,8 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public final class SpeechClient {
@@ -75,9 +77,44 @@ public final class SpeechClient {
          .exceptionally(e -> false);
    }
 
-   public CompletableFuture<Boolean> start() {
-      HttpRequest req = HttpRequest.newBuilder(URI.create(this.base() + "/start")).timeout(Duration.ofSeconds(2L)).POST(BodyPublishers.noBody()).build();
-      return this.http.sendAsync(req, BodyHandlers.ofString()).thenApply(r -> r.statusCode() == 200).exceptionally(e -> false);
+   /** Starts recording from the microphone chosen in the settings; completes with the device's name, "" on failure. */
+   public CompletableFuture<String> start() {
+      JsonObject body = new JsonObject();
+      String device = ZhNarratorClient.config.microphone;
+      if (device != null && !device.isEmpty()) {
+         body.addProperty("device", device);
+      }
+
+      HttpRequest req = HttpRequest.newBuilder(URI.create(this.base() + "/start"))
+         .timeout(Duration.ofSeconds(2L))
+         .header("Content-Type", "application/json")
+         .POST(BodyPublishers.ofString(body.toString()))
+         .build();
+      return this.http.sendAsync(req, BodyHandlers.ofString()).thenApply(r -> {
+         if (r.statusCode() != 200) {
+            return "";
+         } else {
+            JsonObject o = JsonParser.parseString(r.body()).getAsJsonObject();
+            return o.has("device") ? o.get("device").getAsString() : "";
+         }
+      }).exceptionally(e -> "");
+   }
+
+   /** The microphones the helper can use; empty if it is not running. Asks the helper and waits briefly. */
+   public List<String> devices() {
+      List<String> out = new ArrayList<>();
+
+      try {
+         HttpRequest req = HttpRequest.newBuilder(URI.create(this.base() + "/devices")).timeout(Duration.ofMillis(800L)).GET().build();
+         String reply = this.http.send(req, BodyHandlers.ofString()).body();
+         JsonParser.parseString(reply).getAsJsonObject().getAsJsonArray("devices").forEach(e -> out.add(e.getAsString()));
+      } catch (Exception var4) {
+         if (var4 instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+         }
+      }
+
+      return out;
    }
 
    public CompletableFuture<SpeechClient.Heard> stop(String expected, float threshold) {
@@ -116,13 +153,26 @@ public final class SpeechClient {
                      cmp == null ? "wrong" : cmp.get("verdict").getAsString(),
                      cmp == null ? 0.0F : cmp.get("score").getAsFloat(),
                      cmp == null ? 99 : cmp.get("syllable_errors").getAsInt(),
-                     cmp == null ? 0 : cmp.get("tone_errors").getAsInt()
+                     cmp == null ? 0 : cmp.get("tone_errors").getAsInt(),
+                     o.has("device") ? o.get("device").getAsString() : "",
+                     o.has("peak") ? o.get("peak").getAsFloat() : -1.0F
                   );
                }
             }
          );
    }
 
-   public record Heard(String text, String reading, float confidence, boolean silent, String verdict, float score, int syllableErrors, int toneErrors) {
+   public record Heard(
+      String text,
+      String reading,
+      float confidence,
+      boolean silent,
+      String verdict,
+      float score,
+      int syllableErrors,
+      int toneErrors,
+      String device,
+      float peak
+   ) {
    }
 }

@@ -74,7 +74,7 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
          .addSmall(
             new OptionInstance[]{
                OptionInstance.createBoolean("zhnarrator.options.quiz_icons", c.quizShowIcons, v -> c.quizShowIcons = v),
-               slider("zhnarrator.options.angry_after", 0.0, 10.0, 1.0, c.angryAfterWrong, "", v -> c.angryAfterWrong = Math.round(v))
+               slider("zhnarrator.options.angry_after_rounds", 0.0, 10.0, 1.0, c.angryAfterFailedRounds, "", v -> c.angryAfterFailedRounds = Math.round(v))
             }
          );
       this.list
@@ -84,7 +84,13 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
                cycle("zhnarrator.options.learned_sound_style", List.of("xp", "fanfare", "soft"), c.learnedSoundStyle, v -> c.learnedSoundStyle = v)
             }
          );
-      this.list.addBig(percent("zhnarrator.options.learned_sound_volume", c.learnedSoundVolume, v -> c.learnedSoundVolume = v));
+      this.list
+         .addSmall(
+            new OptionInstance[]{
+               percent("zhnarrator.options.learned_sound_volume", c.learnedSoundVolume, v -> c.learnedSoundVolume = v),
+               OptionInstance.createBoolean("zhnarrator.options.pledge_on_death", c.pledgeOnDeath, v -> c.pledgeOnDeath = v)
+            }
+         );
       if (iconWords) {
          this.list
             .addSmall(

@@ -1,14 +1,19 @@
 package dev.ame.zhnarrator;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Prediction;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -16,10 +21,14 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 
-final class Consequences {
+public final class Consequences {
    private static final Identifier LOST_HEARTS = Identifier.fromNamespaceAndPath("zhnarrator", "lost_hearts");
-   private static final int EFFECTS_PER_ANSWER = 2;
+   /** One effect per answered question: a round of four questions gives four. */
+   private static final int EFFECTS_PER_ANSWER = 1;
+   private static final Random RANDOM = new Random();
    private static final List<Consequences.Effect> DEBUFFS = List.of(
       new Consequences.Effect(MobEffects.SLOWNESS, 20, 5),
       new Consequences.Effect(MobEffects.WEAKNESS, 30, 3),
@@ -128,17 +137,118 @@ final class Consequences {
       }
    }
 
+   /** The angry teacher takes the inventory into the pledge, from where right answers earn it back. */
    static void wipeInventory(Minecraft mc) {
       IntegratedServer server = mc.getSingleplayerServer();
       if (server != null && mc.player != null) {
          UUID uuid = mc.player.getUUID();
+         Progress progress = ZhNarratorClient.progress;
          server.execute(() -> {
             ServerPlayer p = server.getPlayerList().getPlayer(uuid);
             if (p != null) {
-               p.getInventory().clearContent();
+               Inventory inventory = p.getInventory();
+               List<String> items = new ArrayList<>();
+
+               for (int i = 0; i < inventory.getContainerSize(); i++) {
+                  ItemStack stack = inventory.getItem(i);
+                  if (!stack.isEmpty()) {
+                     items.add(encode(p, stack));
+                  }
+               }
+
+               inventory.clearContent();
                p.containerMenu.broadcastChanges();
+               mc.execute(() -> progress.pledge(items));
             }
          });
+      }
+   }
+
+   /**
+    * Called on death (on the server thread): instead of dropping, the items go to the pledge. Only in
+    * singleplayer, for the local player, outside Hardcore and when the quiz is on. Returns true when the
+    * drops were taken, so the caller removes them from the world.
+    */
+   public static boolean pledgeDeathDrops(ServerPlayer p, List<ItemStack> drops) {
+      Minecraft mc = Minecraft.getInstance();
+      NarratorConfig c = ZhNarratorClient.config;
+      if (c.enabled
+         && c.pledgeOnDeath
+         && !c.quizMode.equals("off")
+         && mc.getSingleplayerServer() != null
+         && mc.player != null
+         && p.getUUID().equals(mc.player.getUUID())
+         && !p.level().getLevelData().isHardcore()) {
+         List<String> items = new ArrayList<>();
+
+         for (ItemStack stack : drops) {
+            if (!stack.isEmpty()) {
+               items.add(encode(p, stack));
+            }
+         }
+
+         if (items.isEmpty()) {
+            return false;
+         } else {
+            Progress progress = ZhNarratorClient.progress;
+            mc.execute(() -> {
+               progress.pledge(items);
+               if (mc.player != null) {
+                  mc.player.sendSystemMessage(
+                     Component.literal("§6Your " + items.size() + " stacks went to the pledge. §7Every right quiz answer gives one back, chosen at random.")
+                  );
+               }
+            });
+            return true;
+         }
+      } else {
+         return false;
+      }
+   }
+
+   /** A right answer gives one random stack back from the pledge. */
+   static void returnPledged(Minecraft mc) {
+      IntegratedServer server = mc.getSingleplayerServer();
+      Progress progress = ZhNarratorClient.progress;
+      String item = server != null && mc.player != null ? progress.takePledged(RANDOM) : null;
+      if (item != null) {
+         UUID uuid = mc.player.getUUID();
+         int left = progress.pledgeSize();
+         server.execute(() -> {
+            ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+            if (p == null) {
+               mc.execute(() -> progress.pledge(List.of(item)));
+            } else {
+               ItemStack stack = decode(p, item);
+               if (!stack.isEmpty()) {
+                  Component name = stack.getHoverName();
+                  int count = stack.getCount();
+                  // Into the inventory; what does not fit lands at the player's feet.
+                  p.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+
+                  p.containerMenu.broadcastChanges();
+                  p.sendSystemMessage(
+                     Component.literal("§a+" + count + "× ").append(name.copy()).append(Component.literal(" §7back from the pledge (" + left + " left)"))
+                  );
+               }
+            }
+         });
+      }
+   }
+
+   private static String encode(ServerPlayer p, ItemStack stack) {
+      return ItemStack.CODEC.encodeStart(p.registryAccess().createSerializationContext(JsonOps.INSTANCE), stack).getOrThrow().toString();
+   }
+
+   private static ItemStack decode(ServerPlayer p, String json) {
+      try {
+         return ItemStack.CODEC
+            .parse(p.registryAccess().createSerializationContext(JsonOps.INSTANCE), JsonParser.parseString(json))
+            .resultOrPartial(error -> ZhNarratorClient.LOGGER.warn("Could not restore a pledged item: {}", error))
+            .orElse(ItemStack.EMPTY);
+      } catch (RuntimeException var3) {
+         ZhNarratorClient.LOGGER.warn("Could not restore a pledged item: {}", var3.toString());
+         return ItemStack.EMPTY;
       }
    }
 
@@ -147,7 +257,7 @@ final class Consequences {
       Collections.shuffle(picks);
       StringBuilder names = new StringBuilder();
 
-      for (Consequences.Effect e : picks.subList(0, Math.min(2, picks.size()))) {
+      for (Consequences.Effect e : picks.subList(0, Math.min(EFFECTS_PER_ANSWER, picks.size()))) {
          p.addEffect(new MobEffectInstance(e.effect(), e.seconds() * 20, e.level() - 1));
          names.append(names.isEmpty() ? "" : ", ").append(((MobEffect)e.effect().value()).getDisplayName().getString()).append(" ").append(e.level());
       }

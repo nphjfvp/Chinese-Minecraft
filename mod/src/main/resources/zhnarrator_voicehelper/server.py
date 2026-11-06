@@ -6,7 +6,10 @@ Runs next to the game and owns the microphone, so the game itself never asks for
 
     GET  /health?language=es     -> {"ok": true, "ready": true, "languages": [...], "recording": false}
                                     (asking for a language the helper has not loaded makes it load that model)
-    POST /start                  -> starts recording the default microphone (push-to-talk pressed)
+    GET  /devices                -> {"devices": ["Headset Microphone", ...], "default": "..."}
+    POST /start  {"device": "Headset Microphone"}
+                                 -> starts recording (push-to-talk pressed); the device is optional, a name from
+                                    /devices; without it, or if it is gone, the system's default input is used
     POST /stop   {"expected": "我在走路。", "language": "zh"}
                                  -> stops, transcribes, compares; {"text", "reading", "pinyin", "confidence",
                                     "seconds", "compare": {...}} (compare only when expected is given)
@@ -50,8 +53,40 @@ def log(message: str) -> None:
 LAST_TAKE = Path(__file__).resolve().parent / "last_take.wav"
 
 
+def input_devices() -> list[dict]:
+    """Input devices of the default host API (Windows lists every microphone once per API otherwise)."""
+    try:
+        hostapi = sd.query_devices(kind="input")["hostapi"]
+    except Exception:  # noqa: BLE001 - no default input at all
+        hostapi = None
+    seen, out = set(), []
+    for d in sd.query_devices():
+        if d["max_input_channels"] > 0 and (hostapi is None or d["hostapi"] == hostapi) and d["name"] not in seen:
+            seen.add(d["name"])
+            out.append(d)
+    return out
+
+
+def default_input_name() -> str:
+    try:
+        return sd.query_devices(kind="input")["name"]
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def resolve_device(name: str | None) -> int | None:
+    """The index of the input device with this name, or None for the system default."""
+    if not name:
+        return None
+    for d in input_devices():
+        if d["name"] == name:
+            return d["index"]
+    log(f"microphone {name!r} not found, using the default input {default_input_name()!r}")
+    return None
+
+
 class Mic:
-    """Records the default input; notices on its own when the speaker has finished (speech, then silence)."""
+    """Records the chosen (or default) input; notices on its own when the speaker has finished (speech, then silence)."""
 
     SPEECH_MIN_S = 0.3   # this much sound above the noise floor counts as "started talking"
     SILENCE_END_S = 0.9  # this much quiet after talking ends the take
@@ -67,24 +102,40 @@ class Mic:
         self._floor_frames = 0
         self._speech_s = 0.0
         self._silence_s = 0.0
+        self.device_name = ""
+        self.peak = 0.0
 
-    def start(self) -> None:
+    def start(self, device: str | None = None) -> None:
         with self.lock:
             if self.stream is not None:
                 return
             self.frames = []
             self.done = False
             self._floor, self._floor_frames, self._speech_s, self._silence_s = 0.0, 0, 0.0, 0.0
-            self.stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
-                                         blocksize=int(SAMPLE_RATE * self.FRAME_S), callback=self._on_audio)
+            self.peak = 0.0
+            index = resolve_device(device)
+            try:
+                self.stream = self._open(index)
+            except Exception as e:  # noqa: BLE001 - a chosen device that fails falls back to the default
+                if index is None:
+                    raise
+                log(f"could not open microphone {device!r} ({e}), using the default input")
+                index = None
+                self.stream = self._open(None)
+            self.device_name = sd.query_devices(index, "input")["name"] if index is not None else default_input_name()
             self.stream.start()
             self.started_at = time.time()
+
+    def _open(self, index: int | None) -> sd.InputStream:
+        return sd.InputStream(device=index, samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+                              blocksize=int(SAMPLE_RATE * self.FRAME_S), callback=self._on_audio)
 
     def _on_audio(self, indata, frames, time_info, status) -> None:  # noqa: ANN001 - sounddevice callback
         if self.done:
             return
         chunk = indata[:, 0].copy()
         self.frames.append(chunk)
+        self.peak = max(self.peak, float(np.max(np.abs(chunk))) if chunk.size else 0.0)
         rms = float(np.sqrt(np.mean(chunk * chunk)))
         seconds = len(chunk) / SAMPLE_RATE
         if self._floor_frames < 4:  # the first 0.2 s set the noise floor
@@ -218,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
             ready = models.get(language) is not None
             self._json(200, {"ok": True, "ready": ready, "language": language, "languages": sorted(models.ready),
                              "loading": sorted(models.loading), "failed": models.failed, "recording": mic.recording})
+        elif path == "/devices":
+            self._json(200, {"devices": [d["name"] for d in input_devices()], "default": default_input_name()})
         elif path == "/status":
             self._json(200, {"recording": mic.recording, "done": mic.done,
                              "seconds": round(time.time() - mic.started_at, 2) if mic.recording else 0})
@@ -232,8 +285,11 @@ class Handler(BaseHTTPRequestHandler):
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
             if url.path == "/start":
-                mic.start()
-                self._json(200, {"ok": True})
+                raw = self._body()
+                body = json.loads(raw.decode("utf-8")) if raw else {}
+                mic.start(body.get("device") or None)
+                log(f"recording from {mic.device_name!r}")
+                self._json(200, {"ok": True, "device": mic.device_name})
             elif url.path == "/stop":
                 raw = self._body()
                 body = json.loads(raw.decode("utf-8")) if raw else {}
@@ -241,8 +297,11 @@ class Handler(BaseHTTPRequestHandler):
                 audio, seconds = mic.stop()
                 if time.time() - t_stop > 0.3:
                     log(f"stopping the microphone took {time.time() - t_stop:.2f}s")
-                self._json(200, self._recognize(audio, seconds, body.get("expected"), float(body.get("threshold", 0.6)),
-                                                body.get("language") or LANGUAGES[0]))
+                result = self._recognize(audio, seconds, body.get("expected"), float(body.get("threshold", 0.6)),
+                                         body.get("language") or LANGUAGES[0])
+                result["device"] = mic.device_name
+                result["peak"] = round(mic.peak, 4)
+                self._json(200, result)
             else:
                 self._json(404, {"error": "unknown endpoint"})
         except Exception as e:  # noqa: BLE001 - report to the game instead of dying
@@ -311,7 +370,9 @@ def main() -> None:
         dev = sd.query_devices(kind="input")
         where = {"darwin": "System Settings → Sound → Input", "win32": "Settings → System → Sound → Input"}.get(
             sys.platform, "your system's sound settings")
-        print(f"microphone: {dev['name']} ({dev['default_samplerate']:.0f} Hz); change it in {where}", flush=True)
+        print(f"microphone: {dev['name']} ({dev['default_samplerate']:.0f} Hz); change it in {where}"
+              " or in the game's settings (Microphone)", flush=True)
+        print("microphones: " + ", ".join(d["name"] for d in input_devices()), flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"no input device found: {e}", flush=True)
     try:

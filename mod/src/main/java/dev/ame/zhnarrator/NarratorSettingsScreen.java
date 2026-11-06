@@ -112,6 +112,7 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
                }
             );
          this.list.addBig(this.voiceButton());
+         this.list.addBig(this.microphoneOption());
          this.list
             .addSmall(
                new OptionInstance[]{
@@ -177,6 +178,30 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
                this.minecraft.reloadResourcePacks();
             }
          }
+      );
+   }
+
+   /** The microphone for voice answers: the system default, or one the voice helper lists. */
+   private OptionInstance<String> microphoneOption() {
+      NarratorConfig c = ZhNarratorClient.config;
+      List<String> values = new ArrayList<>();
+      values.add("default");
+      QuizManager quiz = ZhNarratorClient.quiz;
+      List<String> devices = quiz != null && quiz.speech().checked() ? quiz.speech().devices() : List.of();
+      values.addAll(devices);
+      if (c.microphone != null && !c.microphone.isEmpty() && !values.contains(c.microphone)) {
+         values.add(c.microphone);
+      }
+
+      return new OptionInstance<>(
+         "zhnarrator.options.microphone",
+         OptionInstance.noTooltip(),
+         (caption, v) -> Component.translatable(
+            "options.generic_value", new Object[]{caption, v.equals("default") ? Component.translatable("zhnarrator.options.microphone.default") : Component.literal(v)}
+         ),
+         new Enum(values, Codec.STRING),
+         c.microphone == null || c.microphone.isEmpty() ? "default" : c.microphone,
+         v -> c.microphone = v.equals("default") ? "" : v
       );
    }
 

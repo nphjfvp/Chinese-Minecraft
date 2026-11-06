@@ -42,7 +42,6 @@ public final class QuizManager {
    private long lastStatusPoll;
    private volatile boolean helperDone;
    private boolean hintNow;
-   private int wrongStreak;
    private long frownUntil;
    private long shootAt;
    private int killInTicks;
@@ -69,6 +68,18 @@ public final class QuizManager {
    @Nullable
    private QuizManager.Suspended suspended;
    private long busyUntil;
+   /** The round being asked: up to four questions about one sentence. */
+   @Nullable
+   private QuizRound round;
+   private int roundStep;
+   /** False once one of questions 1–3 was answered wrong. */
+   private boolean roundOk;
+   private long nextStepAt;
+   private int failedRounds;
+   /** The microphone the helper last recorded from, set from its answer. */
+   private volatile String micName = "";
+   private String micAnnounced = "";
+   private static final long BETWEEN_QUESTIONS_MS = 1500L;
 
    public QuizManager(PhraseBook phrases, Speaker speaker, Progress progress) {
       this.phrases = phrases;
@@ -146,15 +157,26 @@ public final class QuizManager {
          this.lastYaw = yaw;
          this.lastPitch = pitch;
          this.helperUp = this.speech.isAvailable();
+         String mic = this.micName;
+         if (!mic.isEmpty() && !mic.equals(this.micAnnounced)) {
+            this.micAnnounced = mic;
+            chat(mc, "§7Microphone: " + mic + " (change it in the settings, I)");
+         }
          NarratorConfig c = ZhNarratorClient.config;
          if (this.suspended != null) {
             if (mc.gui.screen() == null) {
                QuizManager.Suspended s = this.suspended;
                this.suspended = null;
-               mc.gui.setScreen(new QuizScreen(this, s.question(), s.options(), (float)s.remainingMs() / 1000.0F));
+               mc.gui.setScreen(new QuizScreen(this, s.question(), s.options(), (float)s.remainingMs() / 1000.0F, s.titleKey(), s.titleArg()));
             }
          } else if (this.pending != null && this.phase != QuizManager.Phase.NONE) {
             this.tickSpeech(mc, now);
+         } else if (this.round != null) {
+            if (player.isDeadOrDying()) {
+               this.endRound(now);
+            } else if (this.pending == null && now >= this.nextStepAt && mc.gui.screen() == null) {
+               this.openStep(mc, now);
+            }
          } else if (c.enabled && !c.quizMode.equals("off") && this.pending == null && mc.gui.screen() == null) {
             boolean wantSpeech = c.quizMode.equals("speech") || c.quizMode.equals("mixed") && this.random.nextBoolean();
             if (this.nothingToAsk) {
@@ -186,33 +208,15 @@ public final class QuizManager {
                      this.nothingToAsk = true;
                      this.lastPickTryAt = now;
                   } else {
-                     boolean speak = wantSpeech && this.helperUp && speechable(question);
-                     ZhNarratorClient.LOGGER
-                        .info(
-                           "quiz picture for {} (key {}): {}",
-                           new Object[]{question.id(), question.key(), WordIcons.iconFor(question).map(s -> s.getItem().toString()).orElse("none")}
-                        );
-                     this.pending = question;
+                     boolean withSpeech = !c.quizMode.equals("choice") && this.helperUp && speechable(question);
+                     this.round = QuizRound.build(this.phrases, question, this.random, withSpeech, this.options(question));
+                     this.roundStep = 0;
+                     this.roundOk = true;
                      this.lastQuizAt = now;
-                     this.hintNow = false;
                      this.ding(mc);
-                     if (speak) {
-                        this.phase = QuizManager.Phase.WAITING;
-                        this.deadline = now + (long)(c.quizAnswerSeconds * 1500.0F);
-                        this.deadlineTotalMs = this.deadline - now;
-                        this.heard = null;
-                        this.heardError = null;
-                        this.bestHeard = null;
-                        this.attempts = 0;
-                        ZhNarratorClient.LOGGER.info("quiz ask (speech) {} | {}", question.id(), question.en());
-                     } else {
-                        if (wantSpeech && !this.helperUp) {
-                           ZhNarratorClient.LOGGER.info("speech helper not reachable at {}, asking with buttons", c.speechHelperUrl);
-                        }
-
-                        ZhNarratorClient.LOGGER.info("quiz ask {} | {}", question.id(), question.en());
-                        mc.gui.setScreen(new QuizScreen(this, question, this.options(question), c.quizAnswerSeconds));
-                     }
+                     ZhNarratorClient.LOGGER
+                        .info("quiz round {} | {} | {}", new Object[]{question.id(), question.en(), this.round.questions.stream().map(q -> q.step().name()).toList()});
+                     this.openStep(mc, now);
                   }
                }
             }
@@ -230,7 +234,11 @@ public final class QuizManager {
                this.lastStatusPoll = 0L;
                this.helperDone = false;
                this.speaker.stop();
-               this.speech.start();
+               this.speech.start().thenAccept(device -> {
+                  if (!device.isEmpty()) {
+                     this.micName = device;
+                  }
+               });
             } else if (now > this.deadline) {
                this.finishSpeech(mc, this.bestHeard);
             }
@@ -291,9 +299,18 @@ public final class QuizManager {
       this.heardError = null;
       this.bestHeard = null;
       boolean ok = h != null && (h.verdict().equals("exact") || h.verdict().equals("pass"));
-      chat(mc, h != null && !h.silent() ? heardLine(h) : "§7(nothing heard)");
+      chat(mc, h != null && !h.silent() ? heardLine(h) : "§7(nothing heard" + micHint(h) + ")");
       if (question != null) {
          this.answer(mc, question, ok);
+      }
+   }
+
+   /** Which microphone recorded and how loud it got, to find out why nothing was heard. */
+   private static String micHint(@Nullable SpeechClient.Heard h) {
+      if (h == null || h.device().isEmpty()) {
+         return "";
+      } else {
+         return " — microphone: " + h.device() + (h.peak() >= 0.0F ? ", loudest " + Math.round(h.peak() * 100.0F) + "%" : "");
       }
    }
 
@@ -389,28 +406,107 @@ public final class QuizManager {
    public void debugAskChoice(Minecraft mc, String id) {
       this.phrases.fixed(id).ifPresent(q -> {
          this.pending = q;
-         mc.gui.setScreen(new QuizScreen(this, q, this.options(q), 30.0F));
+         mc.gui.setScreen(new QuizScreen(this, q, this.options(q), 30.0F, "zhnarrator.quiz.prompt", ""));
       });
    }
 
-   public void suspend(Phrase question, List<Phrase> options, long remainingMs) {
-      this.suspended = new QuizManager.Suspended(question, options, remainingMs);
+   public void suspend(Phrase question, List<Phrase> options, long remainingMs, String titleKey, String titleArg) {
+      this.suspended = new QuizManager.Suspended(question, options, remainingMs, titleKey, titleArg);
    }
 
-   public void answer(Minecraft mc, Phrase question, boolean correct) {
+   /** Shows the round's current question: a choice screen, or for the last step the spoken answer. */
+   private void openStep(Minecraft mc, long now) {
+      QuizRound.Question q = this.round.questions.get(this.roundStep);
+      NarratorConfig c = ZhNarratorClient.config;
+      if (q.step() == QuizRound.Step.SPEECH && !this.helperUp) {
+         this.endRound(now);
+      } else {
+         this.pending = q.question();
+         this.hintNow = false;
+         if (q.step() == QuizRound.Step.SPEECH) {
+            this.phase = QuizManager.Phase.WAITING;
+            this.deadline = now + (long)(c.quizAnswerSeconds * 1500.0F);
+            this.deadlineTotalMs = this.deadline - now;
+            this.heard = null;
+            this.heardError = null;
+            this.bestHeard = null;
+            this.attempts = 0;
+            ZhNarratorClient.LOGGER.info("quiz ask (speech) {} | {}", q.question().id(), q.question().en());
+         } else {
+            ZhNarratorClient.LOGGER.info("quiz ask {} {} | {}", new Object[]{q.step(), q.question().id(), q.question().text()});
+            mc.gui.setScreen(new QuizScreen(this, q.question(), q.options(), c.quizAnswerSeconds, q.titleKey(), q.titleArg()));
+         }
+      }
+   }
+
+   private void endRound(long now) {
+      this.round = null;
       this.pending = null;
-      this.lastQuizAt = System.currentTimeMillis();
-      long now = System.currentTimeMillis();
+      this.phase = QuizManager.Phase.NONE;
       this.lastQuizAt = now;
-      boolean mastered = this.progress.answered(question, correct);
+   }
+
+   /** One question of the round was answered (or ran out of time). */
+   public void answer(Minecraft mc, Phrase question, boolean correct) {
+      long now = System.currentTimeMillis();
+      this.pending = null;
+      this.lastQuizAt = now;
+      QuizRound.Step step = this.round == null ? QuizRound.Step.SENTENCE : this.round.questions.get(this.roundStep).step();
+      Phrase sentence = this.round == null ? question : this.round.sentence;
+      // Every question gives one effect, and a right one earns back one stack from the pledge.
       Consequences.onAnswer(mc, correct);
-      this.speaker.sayNow(question);
+      if (correct) {
+         Consequences.returnPledged(mc);
+      }
+
+      // The beginning alone has no recording; the word has one when it is a thing (泥土), not a verb.
+      if (step == QuizRound.Step.WORD && this.round.word != null && this.round.word.key() != null) {
+         this.speaker.sayNow(this.round.word);
+      } else if (step != QuizRound.Step.FRAME) {
+         this.speaker.sayNow(sentence);
+      }
+
+      if (correct) {
+         NarratorHud.hop();
+      } else {
+         this.frownUntil = now + 2500L;
+         if (step != QuizRound.Step.SPEECH) {
+            this.roundOk = false;
+         }
+      }
+
+      if (mc.player != null) {
+         LanguagePacks.Meta meta = this.phrases.meta();
+         String verdict = correct ? "§a" + meta.uiCorrect() + " ✓ " : "§c" + meta.uiWrong() + " ✗ ";
+         mc.player
+            .sendSystemMessage(Component.literal(verdict + question.text() + (question.hasReading() ? "  " + question.reading() : "") + "  — " + question.en()));
+      }
+
+      ZhNarratorClient.LOGGER.info("quiz {} {} {} | {}", new Object[]{step, question.id(), correct ? "correct" : "wrong", question.text()});
+      if (step == QuizRound.Step.SENTENCE) {
+         this.finishLearning(mc, sentence, now);
+      }
+
+      this.roundStep++;
+      if (this.round == null || this.roundStep >= this.round.questions.size()) {
+         this.endRound(now);
+      } else {
+         this.nextStepAt = now + BETWEEN_QUESTIONS_MS;
+      }
+   }
+
+   /**
+    * After question 3: the round counts for learning when questions 1–3 were all right, and two such
+    * rounds in a row master the word. Failed rounds in a row make the teacher angry.
+    */
+   private void finishLearning(Minecraft mc, Phrase sentence, long now) {
+      NarratorConfig cfg = ZhNarratorClient.config;
+      boolean mastered = this.progress.answered(sentence, this.roundOk);
       if (mastered) {
-         boolean word = question.action().equals("hold");
-         NarratorConfig cfg = ZhNarratorClient.config;
+         boolean word = sentence.action().equals("hold");
          if (cfg.learnedSound && cfg.learnedSoundVolume > 0.0F) {
-            String verdict = cfg.learnedSoundStyle;
-            switch (verdict) {
+            String style = cfg.learnedSoundStyle;
+            switch (style) {
                case "fanfare":
                   playMaster(mc, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE.location(), cfg.learnedSoundVolume, 1.0F);
                   break;
@@ -424,35 +520,23 @@ public final class QuizManager {
          }
 
          this.phrases.fixed(word ? "learned_word" : "learned_phrase").ifPresent(this.speaker::sayPriority);
-         NarratorHud.showBanner(question, word, 5000L);
-         chat(mc, "§6" + (word ? "New word learned: " : "New phrase learned: ") + "§e" + question.bare() + " §7— " + question.en().replaceAll("[.!]$", ""));
+         NarratorHud.showBanner(sentence, word, 5000L);
+         chat(mc, "§6" + (word ? "New word learned: " : "New phrase learned: ") + "§e" + sentence.bare() + " §7— " + sentence.en().replaceAll("[.!]$", ""));
       }
 
-      NarratorConfig cfg = ZhNarratorClient.config;
-      if (correct) {
-         this.wrongStreak = 0;
-         NarratorHud.hop();
+      if (this.roundOk) {
+         this.failedRounds = 0;
       } else {
-         this.wrongStreak++;
-         this.frownUntil = now + 2500L;
-         if (cfg.angryAfterWrong > 0 && this.wrongStreak >= cfg.angryAfterWrong) {
-            this.wrongStreak = 0;
+         this.failedRounds++;
+         if (cfg.angryAfterFailedRounds > 0 && this.failedRounds >= cfg.angryAfterFailedRounds) {
+            this.failedRounds = 0;
             this.angryUntil = now + 8000L;
             Optional<Phrase> angry = this.phrases.fixed("angry");
             angry.ifPresent(this.speaker::sayPriority);
             Consequences.wipeInventory(mc);
-            chat(mc, "§c" + angry.map(Phrase::text).orElse("") + " §7The teacher is angry: your inventory is gone.");
+            chat(mc, "§c" + angry.map(Phrase::text).orElse("") + " §7The teacher is angry: your inventory went to the pledge. Every right answer gives one stack back.");
          }
       }
-
-      if (mc.player != null) {
-         LanguagePacks.Meta meta = this.phrases.meta();
-         String verdict = correct ? "§a" + meta.uiCorrect() + " ✓ " : "§c" + meta.uiWrong() + " ✗ ";
-         mc.player
-            .sendSystemMessage(Component.literal(verdict + question.text() + (question.hasReading() ? "  " + question.reading() : "") + "  — " + question.en()));
-      }
-
-      ZhNarratorClient.LOGGER.info("quiz {} {} | {}", new Object[]{question.id(), correct ? "correct" : "wrong", question.text()});
    }
 
    private boolean calmMoment(LocalPlayer p, long now) {
@@ -497,7 +581,7 @@ public final class QuizManager {
    }
 
    public boolean questionOpen() {
-      return this.pending != null || this.suspended != null;
+      return this.pending != null || this.suspended != null || this.round != null;
    }
 
    public boolean helperMissing() {
@@ -750,6 +834,6 @@ public final class QuizManager {
       }
    }
 
-   private record Suspended(Phrase question, List<Phrase> options, long remainingMs) {
+   private record Suspended(Phrase question, List<Phrase> options, long remainingMs, String titleKey, String titleArg) {
    }
 }

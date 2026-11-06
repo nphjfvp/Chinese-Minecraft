@@ -25,8 +25,10 @@ public final class QuizScreen extends Screen {
    private final long acceptAfter;
    private boolean answered;
    private final boolean listening;
+   private final String titleKey;
+   private final String titleArg;
 
-   public QuizScreen(QuizManager quiz, Phrase question, List<Phrase> options, float seconds) {
+   public QuizScreen(QuizManager quiz, Phrase question, List<Phrase> options, float seconds, String titleKey, String titleArg) {
       super(Component.translatable("zhnarrator.quiz.title"));
       this.quiz = quiz;
       this.question = question;
@@ -36,6 +38,8 @@ public final class QuizScreen extends Screen {
       this.deadline = System.currentTimeMillis() + this.totalMs;
       this.acceptAfter = System.currentTimeMillis() + 700L;
       this.listening = question.en().isBlank() || question.en().equals(question.text());
+      this.titleKey = titleKey == null || titleKey.isEmpty() ? "zhnarrator.quiz.prompt" : titleKey;
+      this.titleArg = titleArg == null ? "" : titleArg;
    }
 
    private int buttonX(int i) {
@@ -116,7 +120,9 @@ public final class QuizScreen extends Screen {
          });
       }
 
-      Component title = Component.translatable(this.listening ? "zhnarrator.quiz.listen" : "zhnarrator.quiz.prompt");
+      Component title = this.listening
+         ? Component.translatable("zhnarrator.quiz.listen")
+         : Component.translatable(this.titleKey, new Object[]{Component.literal(this.titleArg).withStyle(this.kai)});
       g.text(this.font, title, (int)(cx - this.font.width(title) / 2.0F), this.height / 2 - 62, -4473925, true);
       Matrix3x2fStack pose = g.pose();
       if (!this.listening) {
@@ -171,7 +177,7 @@ public final class QuizScreen extends Screen {
 
    public void onClose() {
       if (!this.answered) {
-         this.quiz.suspend(this.question, this.options, Math.max(1000L, this.deadline - System.currentTimeMillis()));
+         this.quiz.suspend(this.question, this.options, Math.max(1000L, this.deadline - System.currentTimeMillis()), this.titleKey, this.titleArg);
          this.minecraft.gui.setScreen(new PauseScreen(true));
       } else {
          super.onClose();

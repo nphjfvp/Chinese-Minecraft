@@ -66,6 +66,12 @@ public final class NarratorConfig {
    public int masterAfterCorrect = 2;
    /** Shortest time between two narrated sentences; what happens in between is not said. */
    public float speechGapSeconds = 10.0F;
+   /** Microphone name for voice answers, as the helper lists it; empty for the system default. */
+   public String microphone = "";
+   /** Failed rounds in a row (questions 1–3 not all right) until the teacher gets angry; 0 turns it off. */
+   public int angryAfterFailedRounds = 2;
+   /** On death the items go to the pledge (earned back through the quiz) instead of dropping. */
+   public boolean pledgeOnDeath = true;
    public boolean hudEnabled = true;
    public String hudFont = "default";
    public float hudScale = 2.0F;

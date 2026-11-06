@@ -71,6 +71,10 @@ public final class Progress {
 
    public void switchWorld(String key) {
       this.current = this.worlds.computeIfAbsent(key, k -> new Progress.World());
+      if (this.current.pledge == null) {
+         this.current.pledge = new java.util.ArrayList<>();
+      }
+
       this.keyCorrect = null;
       this.save();
       ZhNarratorClient.LOGGER.info("progress for world '{}': {} phrases heard", key, this.current.heard.size());
@@ -202,6 +206,31 @@ public final class Progress {
       return added;
    }
 
+   /** Items taken by the angry teacher or by death, as saved item data; earned back by right answers. */
+   public void pledge(List<String> items) {
+      if (!items.isEmpty()) {
+         this.current.pledge.addAll(items);
+         this.save();
+      }
+   }
+
+   /** Removes and returns one random pledged item, or null when the pledge is empty. */
+   @org.jetbrains.annotations.Nullable
+   public String takePledged(java.util.Random random) {
+      List<String> pledge = this.current.pledge;
+      if (pledge.isEmpty()) {
+         return null;
+      } else {
+         String item = pledge.remove(random.nextInt(pledge.size()));
+         this.save();
+         return item;
+      }
+   }
+
+   public int pledgeSize() {
+      return this.current.pledge.size();
+   }
+
    public void addPlayTime(long ms) {
       this.playMs += ms;
       this.dirty = true;
@@ -306,5 +335,6 @@ public final class Progress {
       public Map<String, int[]> quiz = new HashMap<>();
       public int heartsLost;
       public int deaths;
+      public List<String> pledge = new java.util.ArrayList<>();
    }
 }
