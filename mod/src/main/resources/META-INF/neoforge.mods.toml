@@ -1,0 +1,33 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "zhnarrator"
+version = "0.3.5+mc26.3"
+displayName = "Learn or Die: Language Teacher"
+authors = "Laren"
+iconFile = "assets/zhnarrator/icon.png"
+description = '''
+Learn Mandarin while you play. Your teacher says what you are doing in Chinese (characters, pinyin and English on screen), then quizzes you: right answers give buffs, wrong answers give debuffs.
+'''
+
+[[mixins]]
+config = "zhnarrator.client.mixins.json"
+
+[[mixins]]
+config = "zhnarrator.neoforge.mixins.json"
+
+[[dependencies.zhnarrator]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.3.0.99,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.zhnarrator]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.3,26.4)"
+ordering = "NONE"
+side = "CLIENT"

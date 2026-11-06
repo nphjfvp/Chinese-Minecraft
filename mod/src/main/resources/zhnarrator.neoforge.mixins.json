@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "dev.ame.zhnarrator.neoforge.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"MultiPlayerGameModeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

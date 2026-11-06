@@ -1,0 +1,4 @@
+build/
+mod/build/
+mod/.gradle/
+__pycache__/

@@ -1,0 +1,32 @@
+[project]
+name = "zhnarrator-speech"
+version = "0.1.0"
+description = "Local speech helper for the Learn or Die: Language Teacher mod: records the microphone on request and transcribes Mandarin with an acoustic CTC model (no language model, no guessing)"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.4",
+    "transformers>=4.44",
+    "numpy>=1.26",
+    "soundfile>=0.12",
+    "sounddevice>=0.5",
+    "pypinyin>=0.53",
+    "pykakasi>=2.3",
+]
+
+[tool.uv]
+# The platforms PyTorch publishes wheels for. The mod offers voice answers only on these.
+environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+
+[tool.uv.sources]
+# PyPI's Linux torch pulls about 2.5 GB of CUDA libraries; the CPU build is all the helper needs.
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
