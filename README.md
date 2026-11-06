@@ -9,25 +9,46 @@ dich danach ab. Richtige Antworten bringen Buffs, falsche Debuffs.
 
 ## Was diese Version anders macht
 
-**Eine Quiz-Runde hat bis zu 4 Fragen zu einem Satz**, zum Beispiel 我在挖泥土 („I am digging the dirt“):
+**Eine Quiz-Runde hat bis zu 6 Fragen zu einem Satz**, zum Beispiel 我在挖泥土 („I am digging the dirt“):
 
-1. **Satzanfang:** Welcher Anfang passt? 我在挖… / 我捡到… / 我在放… / 我扔了…
-2. **Wort:** Was heißt *dirt*? 泥土 und drei andere Wörter. Bei Sätzen ohne Gegenstand (laufen, springen) wird das
+1. **Hören:** Die Lehrerin sagt den Satz nur, ohne Text und ohne Englisch. Welcher war es? Die falschen Antworten
+   handeln vom selben Wort (我捡到泥土, 我在放泥土 …), du musst also das Verb heraushören.
+2. **Satzanfang:** Welcher Anfang passt? 我在挖… / 我捡到… / 我在放… / 我扔了…
+3. **Wort:** Was heißt *dirt*? 泥土 und drei andere Wörter. Bei Sätzen ohne Gegenstand (laufen, springen) wird das
    Verb gefragt: 我在 … *走路*.
-3. **Ganzer Satz:** wie bisher.
-4. **Sprechen:** den ganzen Satz sagen. Nur wenn das Hilfsprogramm für Sprachantworten läuft und der Quizmodus nicht
+4. **Ton:** Welchen Ton hat 泥 ni? nī / ní / nǐ / nì. Gefragt wird eine Silbe des Wortes mit Ton.
+5. **Ganzer Satz:** wie bisher.
+6. **Sprechen:** den ganzen Satz sagen. Nur wenn das Hilfsprogramm für Sprachantworten läuft und der Quizmodus nicht
    *choice* ist.
 
 Fehlt einem Satz ein Teil (etwa „下雨了“, der mit dem Verb beginnt), fällt die Frage weg. **Jede Frage gibt einen
-Effekt**: positiv bei richtig, negativ bei falsch.
+Effekt**: positiv bei richtig, negativ bei falsch. Hör- und Tonfrage lassen sich unter *Advanced settings* abschalten
+(*Listening question*, *Tone question*), falls dir die Runden zu lang sind.
+
+**Töne.** Wörter, bei denen du Töne falsch wählst oder falsch sprichst (der Sprachtest erkennt Tonfehler), kommen
+unter den aktiven Wörtern häufiger dran. Bei beherrschten Wörtern rücken die Wiederholungen nicht weiter auseinander,
+solange die Töne noch wackeln. In der Lernübersicht sind solche Wörter mit **♪** markiert.
+
+**Pinyin wird weniger.** Bei beherrschten Wörtern zeigt der Satz unten nur noch Schriftzeichen; mit gedrückter rechter
+Shift-Taste siehst du das Pinyin trotzdem. Im Quiz stehen bei beherrschten Wörtern keine Pinyin-Hilfen unter den
+Antworten. Abschaltbar unter *No pinyin for mastered words*.
+
+**Lernübersicht (Taste J).** Drei Spalten: die Wörter, die du gerade lernst, mit ihrer Serie (●○ = 1 von 2 guten
+Runden), die beherrschten Wörter mit der nächsten Wiederholung („due“ = fällig) und der Inhalt des Pfands mit Bildern.
+
+**Fullbright (Taste H).** Alles so hell wie mit Nachtsicht, nur auf deinem Rechner und ohne Effekt. Auch unter
+*Advanced settings* → *Fullbright*.
 
 **Gegenstände zurückverdienen (Pfand).** Leert die wütende Lehrerin dein Inventar oder stirbst du, kommen die
 Gegenstände ins Pfand der Welt, statt verloren zu gehen oder auf dem Boden zu liegen. **Jede richtige Frage gibt einen
 zufälligen Stapel zurück**; was nicht ins Inventar passt, landet vor deinen Füßen. Im Hardcore-Modus bleibt der Tod
 das Ende. Beim Tod lässt sich das Pfand unter *Advanced settings* → *Death: items to the pledge* abschalten.
 
-**Die wütende Lehrerin** wird nach **2 verpatzten Runden hintereinander** wütend (Fragen 1–3 nicht alle richtig) und
-nimmt das Inventar ins Pfand.
+Wie viele Stapel im Pfand liegen, steht oben links neben „learned“ und den Toden (Truhe), was genau drin ist, in der
+Lernübersicht (Taste J).
+
+**Die wütende Lehrerin** wird nach **2 verpatzten Runden hintereinander** wütend und nimmt das Inventar ins Pfand.
+Verpatzt heißt: Satzanfang, Wort oder ganzer Satz war falsch. Hören, Ton und Sprechen geben nur ihren Effekt.
 
 **Das Quiz lernt nur wenige Wörter auf einmal.** Am Anfang hörst du sehr viel (laufen, schwimmen, Erde, Holz,
 Spitzhacke …). Das Quiz fragt aber nur eine feste Zahl von Wörtern ab, standardmäßig 5.
@@ -35,9 +56,9 @@ Spitzhacke …). Das Quiz fragt aber nur eine feste Zahl von Wörtern ab, standa
 - Ein Wort ist ein Gegenstand, Block oder Mob (Erde, Eichenbretter, Zombie …) oder eine Tätigkeit ohne Gegenstand
   (laufen, sprinten, springen). Zu „Erde“ kann jeder gehörte Satz mit Erde abgefragt werden.
 - Neue Wörter sind die, die du im Spiel am häufigsten gehört hast. Im Chat steht dann „★ New word to learn: …“.
-- Nach **2 Runden hintereinander, in denen die Fragen 1–3 richtig waren,** ist ein Wort beherrscht („New word
-  learned“), und das nächste Wort rückt nach. Eine verpatzte Runde setzt die Serie zurück. Das Sprechen zählt hier
-  nicht mit, weil die Spracherkennung danebenliegen kann; es gibt nur seinen Effekt.
+- Nach **2 Runden hintereinander, in denen Satzanfang, Wort und ganzer Satz richtig waren,** ist ein Wort beherrscht („New word
+  learned“), und das nächste Wort rückt nach. Eine verpatzte Runde setzt die Serie zurück. Hören, Ton und Sprechen
+  zählen hier nicht mit; das Sprechen schon deshalb nicht, weil die Spracherkennung danebenliegen kann.
 - Beherrschte Wörter kommen mit **Spaced Repetition** wieder: nach 10 Minuten, 30 Minuten, 2 Stunden, 6 Stunden,
   1 Tag, 3 Tagen und dann 1 Woche **Spielzeit**. Eine fällige Wiederholung kommt vor den neuen Wörtern dran. Wer sie
   falsch beantwortet, fängt wieder bei 10 Minuten an.
@@ -58,7 +79,9 @@ Wurde nichts gehört, steht dort auch, wie laut es am lautesten war; bei 0 % kom
 
 **Einstellungen** (Taste I): *Words learned at once* (Wörter gleichzeitig), *Pause between sentences* (Satzpause) und
 *Microphone* stehen im Hauptmenü, *Mastered after N good rounds* (gute Runden bis „beherrscht“), *Angry after N
-failed rounds* und *Death: items to the pledge* unter *Advanced settings*. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
+failed rounds*, *Death: items to the pledge*, *Listening question*, *Tone question*, *No pinyin for mastered words*
+und *Fullbright* unter *Advanced settings*. Die Tasten (J Übersicht, H Fullbright) lassen sich unter Optionen →
+Steuerung → Tastenbelegung ändern. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
 words“, „Re-ask after“, „Quiet after correct“ und „Angry after N wrong“ gibt es nicht mehr, weil das neue System sie ersetzt.
 
 ## Lizenz
@@ -149,7 +172,10 @@ dekompiliert. Die Namen sind echt, Kommentare gibt es aber keine. Die wichtigste
 |---|---|
 | `ActionDetector` | Erkennt, was du tust (laufen, abbauen, essen, kämpfen …), und wählt den passenden Satz. |
 | `QuizManager` | Wann und was abgefragt wird, der Ablauf einer Runde, wann ein Wort als gelernt gilt. |
-| `QuizRound` | Baut die Runde: Satzanfang, Wort, ganzer Satz, Sprechen, mit den falschen Antworten. |
+| `QuizRound` | Baut die Runde: Hören, Satzanfang, Wort, Ton, ganzer Satz, Sprechen, mit den falschen Antworten. |
+| `Tones` | Pinyin-Töne erkennen und eine Silbe in alle vier Töne setzen. |
+| `LearningScreen` | Die Lernübersicht (Taste J). |
+| `mixin/LightmapFullbrightMixin` | Fullbright. |
 | `QuizScreen` | Das Abfragefenster mit den vier Antworten. |
 | `Consequences` | Belohnungen und Strafen (Effekte, wütende Lehrerin) und das Pfand. |
 | `NarratorHud` | Der Satz auf dem Bildschirm mit Pinyin und Englisch. |

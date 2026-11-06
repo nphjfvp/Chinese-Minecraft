@@ -3,7 +3,8 @@
 	"package": "dev.ame.zhnarrator.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"GuiItemIconMixin"
+		"GuiItemIconMixin",
+		"LightmapFullbrightMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

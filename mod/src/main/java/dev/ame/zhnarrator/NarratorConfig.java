@@ -72,6 +72,14 @@ public final class NarratorConfig {
    public int angryAfterFailedRounds = 2;
    /** On death the items go to the pledge (earned back through the quiz) instead of dropping. */
    public boolean pledgeOnDeath = true;
+   /** A round starts with a listening question: the sentence is only heard. */
+   public boolean quizListen = true;
+   /** A round asks the tone of one syllable of the word (Chinese). */
+   public boolean quizTones = true;
+   /** Mastered words show no pinyin, in the narration (hold the pinyin key to see it) and in the quiz. */
+   public boolean pinyinFadeMastered = true;
+   /** Everything as bright as with night vision. */
+   public boolean fullbright = false;
    public boolean hudEnabled = true;
    public String hudFont = "default";
    public float hudScale = 2.0F;

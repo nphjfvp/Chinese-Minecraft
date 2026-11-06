@@ -34,6 +34,9 @@ class QuizRoundTest {
    @BeforeEach
    void setUp() {
       ZhNarratorClient.config = new NarratorConfig();
+      // These tests look at questions 1–3 and speaking; the listening and tone questions have their own tests.
+      ZhNarratorClient.config.quizListen = false;
+      ZhNarratorClient.config.quizTones = false;
       ZhNarratorClient.phrases = book;
    }
 

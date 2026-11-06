@@ -66,6 +66,20 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
       this.list
          .addSmall(
             new OptionInstance[]{
+               OptionInstance.createBoolean("zhnarrator.options.quiz_listen", c.quizListen, v -> c.quizListen = v),
+               OptionInstance.createBoolean("zhnarrator.options.quiz_tones", c.quizTones, v -> c.quizTones = v)
+            }
+         );
+      this.list
+         .addSmall(
+            new OptionInstance[]{
+               OptionInstance.createBoolean("zhnarrator.options.pinyin_fade", c.pinyinFadeMastered, v -> c.pinyinFadeMastered = v),
+               OptionInstance.createBoolean("zhnarrator.options.fullbright", c.fullbright, v -> c.fullbright = v)
+            }
+         );
+      this.list
+         .addSmall(
+            new OptionInstance[]{
                OptionInstance.createBoolean("zhnarrator.options.quiz_reward", c.quizReward, v -> c.quizReward = v),
                OptionInstance.createBoolean("zhnarrator.options.quiz_pause", c.quizPauseGame, v -> c.quizPauseGame = v)
             }

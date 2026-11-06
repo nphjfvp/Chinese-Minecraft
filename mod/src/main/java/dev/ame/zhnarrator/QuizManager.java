@@ -300,6 +300,9 @@ public final class QuizManager {
       this.bestHeard = null;
       boolean ok = h != null && (h.verdict().equals("exact") || h.verdict().equals("pass"));
       chat(mc, h != null && !h.silent() ? heardLine(h) : "§7(nothing heard" + micHint(h) + ")");
+      if (h != null && !h.silent() && question != null && ZhNarratorClient.phrases != null && ZhNarratorClient.phrases.meta().language().equals("zh")) {
+         this.progress.toneResult(question, h.toneErrors() == 0);
+      }
       if (question != null) {
          this.answer(mc, question, ok);
       }
@@ -459,8 +462,12 @@ public final class QuizManager {
          Consequences.returnPledged(mc);
       }
 
+      if (step == QuizRound.Step.TONE) {
+         this.progress.toneResult(sentence, correct);
+      }
+
       // The beginning alone has no recording; the word has one when it is a thing (泥土), not a verb.
-      if (step == QuizRound.Step.WORD && this.round.word != null && this.round.word.key() != null) {
+      if ((step == QuizRound.Step.WORD || step == QuizRound.Step.TONE) && this.round.word != null && this.round.word.key() != null) {
          this.speaker.sayNow(this.round.word);
       } else if (step != QuizRound.Step.FRAME) {
          this.speaker.sayNow(sentence);
@@ -470,7 +477,7 @@ public final class QuizManager {
          NarratorHud.hop();
       } else {
          this.frownUntil = now + 2500L;
-         if (step != QuizRound.Step.SPEECH) {
+         if (step.countsForLearning()) {
             this.roundOk = false;
          }
       }
@@ -690,7 +697,7 @@ public final class QuizManager {
 
                   if (since >= retryMs) {
                      active.add(e.getKey());
-                     weights.add(1.0 / (1.0 + card.streak));
+                     weights.add((1.0 + 0.5 * card.toneTrouble) / (1.0 + card.streak));
                   }
                }
             }

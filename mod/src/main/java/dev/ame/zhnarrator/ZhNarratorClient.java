@@ -53,6 +53,8 @@ public final class ZhNarratorClient {
    private int debugTicks;
    public static KeyMapping keyPinyin;
    public static KeyMapping keyTalk;
+   public static KeyMapping keyOverview;
+   private static KeyMapping keyFullbright;
    private static Path configFile;
    private static Path configDir;
    private static Path gameDir;
@@ -82,6 +84,9 @@ public final class ZhNarratorClient {
       keySpeed = key("speed", 14, category);
       keyReload = key("reload", 12, category);
       keyTalk = key("talk", 5, category);
+      // Key codes are scancodes: 13 is J, 11 is H (G is taken by quick actions).
+      keyOverview = key("overview", 13, category);
+      keyFullbright = key("fullbright", 11, category);
       return true;
    }
 
@@ -230,6 +235,18 @@ public final class ZhNarratorClient {
 
          while (keyWhatIsThis.consumeClick()) {
             detector.sayLookedAt(mc);
+         }
+
+         while (keyOverview.consumeClick()) {
+            if (mc.player != null) {
+               mc.gui.setScreen(new LearningScreen());
+            }
+         }
+
+         while (keyFullbright.consumeClick()) {
+            config.fullbright = !config.fullbright;
+            config.save(configFile);
+            actionBar(mc, config.fullbright ? "Fullbright on" : "Fullbright off");
          }
 
          if (mc.player != null && mc.level != null && !mc.isPaused()) {

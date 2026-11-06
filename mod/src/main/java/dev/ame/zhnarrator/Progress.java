@@ -128,7 +128,12 @@ public final class Progress {
             return false;
          }
       } else {
-         card.level = correct ? Math.min(card.level + 1, REVIEW_MINUTES.length - 1) : 0;
+         if (!correct) {
+            card.level = 0;
+         } else if (card.toneTrouble < 2) {
+            card.level = Math.min(card.level + 1, REVIEW_MINUTES.length - 1);
+         }
+
          card.dueAt = this.playMs + reviewMs(card.level);
          return false;
       }
@@ -136,7 +141,25 @@ public final class Progress {
 
    /** The word a phrase teaches: its item, block or creature, or the phrase itself (walk, jump …). */
    public static String cardKey(Phrase p) {
-      return p.key() != null ? p.key() : p.id();
+      if (p.key() != null) {
+         return p.key();
+      } else {
+         // Parts of a round (walk#frame, walk#word) belong to their sentence.
+         int cut = p.id().indexOf('#');
+         return cut < 0 ? p.id() : p.id().substring(0, cut);
+      }
+   }
+
+   /**
+    * Records whether the tones of the word were right, from the tone question or from speaking.
+    * Words with tone trouble are asked more often and their reviews do not move further apart.
+    */
+   public void toneResult(Phrase p, boolean right) {
+      Progress.Card card = this.cards.get(cardKey(p));
+      if (card != null) {
+         card.toneTrouble = right ? Math.max(0, card.toneTrouble - 1) : Math.min(5, card.toneTrouble + 1);
+         this.dirty = true;
+      }
    }
 
    @org.jetbrains.annotations.Nullable
@@ -328,6 +351,8 @@ public final class Progress {
       public long dueAt;
       /** Play time at which the word started being learned. */
       public long since;
+      /** Recent wrong tones, 0–5: in the tone question or when speaking. */
+      public int toneTrouble;
    }
 
    public static final class World {

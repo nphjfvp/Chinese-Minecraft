@@ -37,8 +37,9 @@ public final class QuizScreen extends Screen {
       this.kai = Style.EMPTY.withFont(new Resource(NarratorHud.fontId()));
       this.deadline = System.currentTimeMillis() + this.totalMs;
       this.acceptAfter = System.currentTimeMillis() + 700L;
-      this.listening = question.en().isBlank() || question.en().equals(question.text());
       this.titleKey = titleKey == null || titleKey.isEmpty() ? "zhnarrator.quiz.prompt" : titleKey;
+      // A listening question plays the sentence and hides its English.
+      this.listening = question.en().isBlank() || question.en().equals(question.text()) || this.titleKey.equals("zhnarrator.quiz.listen");
       this.titleArg = titleArg == null ? "" : titleArg;
    }
 
@@ -50,13 +51,19 @@ public final class QuizScreen extends Screen {
       return this.height / 2 + 2 + i / 2 * 44;
    }
 
+   /** Pinyin under the answers, except for mastered words: then the characters have to be read. */
+   private boolean showReadings() {
+      return this.question.hasReading()
+         && !(ZhNarratorClient.config.pinyinFadeMastered && ZhNarratorClient.progress.isMastered(Progress.cardKey(this.question)));
+   }
+
    private Component reading(Phrase option) {
       return NarratorHud.colouredComponent(option, true, Style.EMPTY, 11591935, 0.2F);
    }
 
    protected void init() {
       int widest = 0;
-      if (this.question.hasReading()) {
+      if (this.showReadings()) {
          for (Phrase option : this.options) {
             widest = Math.max(widest, this.font.width(this.reading(option)) + 8);
          }
@@ -107,7 +114,7 @@ public final class QuizScreen extends Screen {
       int cardW = this.colW * 2 + 12 + 32;
       int x0 = Math.round(cx - cardW / 2.0F);
       int top = this.height / 2 - 130;
-      boolean readings = this.question.hasReading();
+      boolean readings = this.showReadings();
       int bottom = this.buttonY(3) + 22 + (readings ? 3 + 9 : 0) + 10;
       NarratorHud.panel(g, x0, top, x0 + cardW, bottom, 255);
       if (ZhNarratorClient.config.quizShowIcons) {

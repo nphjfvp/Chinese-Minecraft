@@ -12,19 +12,29 @@ import org.jetbrains.annotations.Nullable;
 /**
  * One quiz round about one sentence, e.g. 我在挖泥土 "I am digging the dirt":
  * <ol>
+ *    <li>{@link Step#LISTEN}: the sentence is only heard; which one was it (我在挖泥土, 我捡到泥土 …)?</li>
  *    <li>{@link Step#FRAME}: which beginning fits (我在挖…, 我捡到…, 我在放…)?</li>
  *    <li>{@link Step#WORD}: which word is "dirt" (泥土)? Sentences without a thing (我在走路) ask the verb.</li>
+ *    <li>{@link Step#TONE}: which tone has 泥 ni: nī, ní, nǐ or nì?</li>
  *    <li>{@link Step#SENTENCE}: the whole sentence, as the quiz always did.</li>
  *    <li>{@link Step#SPEECH}: say the whole sentence, when the voice helper runs.</li>
  * </ol>
+ * FRAME, WORD and SENTENCE decide whether the round counts for learning; the others give their effect.
  * A step is left out when the sentence has no such part or there are not enough wrong answers to offer.
  */
 final class QuizRound {
    enum Step {
+      LISTEN,
       FRAME,
       WORD,
+      TONE,
       SENTENCE,
-      SPEECH
+      SPEECH;
+
+      /** Whether a wrong answer to this question fails the round for learning. */
+      boolean countsForLearning() {
+         return this == FRAME || this == WORD || this == SENTENCE;
+      }
    }
 
    /** One question. {@code titleKey} is the translation key of the line above the prompt, {@code titleArg} its argument. */
@@ -45,12 +55,82 @@ final class QuizRound {
       this.word = word;
    }
 
+   /**
+    * Which tone does one syllable of the word have? Picks a syllable with a tone (not the neutral one).
+    * The answers are that syllable in the four tones.
+    */
+   @Nullable
+   static Question toneQuestion(Phrase word, String meaning, Random random) {
+      String chars = word.bare();
+      String[] syllables = word.reading().trim().split("\\s+");
+      if (word.reading().isBlank() || chars.codePointCount(0, chars.length()) != syllables.length) {
+         return null;
+      } else {
+         List<Integer> toned = new ArrayList<>();
+
+         for (int i = 0; i < syllables.length; i++) {
+            if (Tones.toneOf(syllables[i]) > 0) {
+               toned.add(i);
+            }
+         }
+
+         if (toned.isEmpty()) {
+            return null;
+         } else {
+            int i = toned.get(random.nextInt(toned.size()));
+            String syllable = syllables[i];
+            String ch = new String(Character.toChars(chars.codePointAt(chars.offsetByCodePoints(0, i))));
+            Phrase right = new Phrase(word.id() + "#tone", "tone", word.key(), syllable, "", meaning, List.of());
+            List<Phrase> options = new ArrayList<>();
+
+            for (String variant : Tones.allTones(syllable)) {
+               options.add(variant.equals(syllable) ? right : new Phrase(word.id() + "#tone", "tone", word.key(), variant, "", meaning, List.of()));
+            }
+
+            if (!options.contains(right)) {
+               return null;
+            } else {
+               String where = syllables.length > 1 ? ch + " " + Tones.bare(syllable) + "  (" + chars + ")" : ch + " " + Tones.bare(syllable);
+               return new Question(Step.TONE, right, options, "zhnarrator.quiz.prompt_tone", where);
+            }
+         }
+      }
+   }
+
+   /** Sentences that sound alike: about the same word first (我捡到泥土, 我在放泥土), then the same action. */
+   private static List<Phrase> listenOptions(PhraseBook book, Phrase sentence, Random random) {
+      Map<String, Phrase> sameWord = new LinkedHashMap<>();
+      Map<String, Phrase> sameAction = new LinkedHashMap<>();
+      List<Phrase> all = sorted(book);
+      Collections.shuffle(all, random);
+
+      for (Phrase other : all) {
+         if (!other.id().equals(sentence.id()) && !PhraseBook.isFragment(other) && !other.text().equals(sentence.text())) {
+            if (sentence.key() != null && sentence.key().equals(other.key()) && PhraseBook.isBareWord(other) == PhraseBook.isBareWord(sentence)) {
+               sameWord.putIfAbsent(other.text(), other);
+            } else if (other.action().equals(sentence.action())) {
+               sameAction.putIfAbsent(other.text(), other);
+            }
+         }
+      }
+
+      return options(sentence, sameWord, sameAction, random);
+   }
+
    /** The sentence split into the beginning, the word and what follows. */
    record Split(List<Phrase.Part> frame, Phrase word, boolean keyed) {
    }
 
    static QuizRound build(PhraseBook book, Phrase sentence, Random random, boolean withSpeech, List<Phrase> sentenceOptions) {
+      NarratorConfig config = ZhNarratorClient.config;
       List<Question> questions = new ArrayList<>();
+      if (config.quizListen) {
+         List<Phrase> options = listenOptions(book, sentence, random);
+         if (options.size() >= 2) {
+            questions.add(new Question(Step.LISTEN, sentence, options, "zhnarrator.quiz.listen", ""));
+         }
+      }
+
       Split split = split(book, sentence);
       Phrase word = null;
       if (split != null && !PhraseBook.isBareWord(sentence)) {
@@ -70,6 +150,14 @@ final class QuizRound {
                   ? new Question(Step.WORD, split.word(), options, "zhnarrator.quiz.prompt_word", "")
                   : new Question(Step.WORD, split.word(), options, "zhnarrator.quiz.prompt_verb", join(split.frame(), false) + " …")
             );
+         }
+      }
+
+      Phrase toned = word != null ? word : (PhraseBook.isBareWord(sentence) ? sentence : null);
+      if (config.quizTones && toned != null && book.meta().language().equals("zh")) {
+         Question tone = toneQuestion(toned, split != null && !split.keyed() ? sentence.en() : toned.en(), random);
+         if (tone != null) {
+            questions.add(tone);
          }
       }
 

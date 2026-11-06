@@ -57,7 +57,10 @@ public final class NarratorHud {
             Component zh = Component.literal(p.text()).withStyle(style);
             Component pinyin = Component.literal(p.reading()).withStyle(style);
             Component en = Component.literal(p.en()).withStyle(style);
-            boolean showPinyin = p.hasReading() && (c.hudShowPinyin || ZhNarratorClient.keyPinyin != null && ZhNarratorClient.keyPinyin.isDown());
+            // Mastered words lose their pinyin, so that the characters get read; the pinyin key still shows it.
+            boolean faded = c.pinyinFadeMastered && ZhNarratorClient.progress != null && ZhNarratorClient.progress.isMastered(Progress.cardKey(p));
+            boolean showPinyin = p.hasReading()
+               && (c.hudShowPinyin && !faded || ZhNarratorClient.keyPinyin != null && ZhNarratorClient.keyPinyin.isDown());
             boolean showEnglish = c.hudShowEnglish && !p.action().equals("hold") && !p.en().equals(p.text());
             // A star marks sentences about a word the quiz is teaching right now.
             boolean learning = ZhNarratorClient.progress != null && ZhNarratorClient.progress.isActive(p);
@@ -215,13 +218,17 @@ public final class NarratorHud {
          boolean hardcore = mc.level != null && mc.level.getLevelData().isHardcore();
          int learned = progress.learnedWords(ZhNarratorClient.phrases);
          int deaths = hardcore ? progress.deaths : progress.world().deaths;
+         int pledged = progress.pledgeSize();
+         Component pledgeNum = Component.literal(Integer.toString(pledged)).withStyle(kai);
+         Component pledgeCap = Component.translatable("zhnarrator.counter.pledge").withStyle(kai);
+         int cell3 = pledged > 0 ? Math.max(20 + Math.round(font.width(pledgeNum) * 1.6F), font.width(pledgeCap)) : 0;
          Component learnedNum = Component.literal(Integer.toString(learned)).withStyle(kai);
          Component deathsNum = Component.literal(Integer.toString(deaths)).withStyle(kai);
          Component learnedCap = Component.translatable("zhnarrator.counter.learned").withStyle(kai);
          Component deathsCap = Component.translatable("zhnarrator.counter.deaths").withStyle(kai);
          int cell1 = Math.max(20 + Math.round(font.width(learnedNum) * 1.6F), font.width(learnedCap));
          int cell2 = Math.max(20 + Math.round(font.width(deathsNum) * 1.6F), font.width(deathsCap));
-         int panelW = 6 + cell1 + 14 + cell2 + 6;
+         int panelW = 6 + cell1 + 14 + cell2 + (pledged > 0 ? 14 + cell3 : 0) + 6;
          Component timerText = timer == null ? null : timer.text().copy().withStyle(kai);
          int timerW = timerText == null ? 0 : font.width(timerText);
          int blockW = counter ? Math.max(panelW, timerW) : timerW;
@@ -238,6 +245,9 @@ public final class NarratorHud {
             panel(g, px0, 0, px0 + panelW, panelH, 255);
             tile(g, font, px0 + 6, 5, Items.BOOK, learnedNum, -8054, learnedCap, 1.6F);
             tile(g, font, px0 + 6 + cell1 + 14, 5, Items.SKELETON_SKULL, deathsNum, deaths > 0 ? -30070 : -4473925, deathsCap, 1.6F);
+            if (pledged > 0) {
+               tile(g, font, px0 + 6 + cell1 + 14 + cell2 + 14, 5, Items.CHEST, pledgeNum, -14467, pledgeCap, 1.6F);
+            }
             cy = panelH + 3;
          }
 
