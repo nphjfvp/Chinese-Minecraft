@@ -93,6 +93,13 @@ public class NarratorSettingsScreen extends OptionsSubScreen {
          this.list
             .addSmall(
                new OptionInstance[]{
+                  slider("zhnarrator.options.active_words", 1.0, 20.0, 1.0, c.activeWords, "", v -> c.activeWords = Math.round(v)),
+                  slider("zhnarrator.options.speech_gap", 0.0, 30.0, 1.0, c.speechGapSeconds, " s", v -> c.speechGapSeconds = v)
+               }
+            );
+         this.list
+            .addSmall(
+               new OptionInstance[]{
                   slider("zhnarrator.options.quiz_interval", 15.0, 300.0, 15.0, c.quizIntervalSeconds, " s", v -> c.quizIntervalSeconds = v),
                   slider("zhnarrator.options.quiz_answer", 5.0, 30.0, 1.0, c.quizAnswerSeconds, " s", v -> c.quizAnswerSeconds = v)
                }

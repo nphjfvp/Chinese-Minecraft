@@ -60,6 +60,12 @@ public final class NarratorConfig {
    public boolean quizPauseGame = false;
    public boolean quizShowIcons = true;
    public int angryAfterWrong = 3;
+   /** How many words the quiz teaches at the same time. */
+   public int activeWords = 5;
+   /** Correct answers in a row until a word counts as mastered. */
+   public int masterAfterCorrect = 2;
+   /** Shortest time between two narrated sentences; what happens in between is not said. */
+   public float speechGapSeconds = 10.0F;
    public boolean hudEnabled = true;
    public String hudFont = "default";
    public float hudScale = 2.0F;

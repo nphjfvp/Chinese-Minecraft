@@ -2,8 +2,9 @@ package dev.ame.zhnarrator;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import net.minecraft.ChatFormatting;
@@ -126,6 +127,8 @@ public final class QuizManager {
             if (this.phase != QuizManager.Phase.NONE) {
                this.deadline += gap;
             }
+         } else if (gap > 0L) {
+            this.progress.addPlayTime(gap);
          }
 
          if (this.lastHealth >= 0.0F && player.getHealth() < this.lastHealth - 0.5F) {
@@ -399,9 +402,10 @@ public final class QuizManager {
       this.lastQuizAt = System.currentTimeMillis();
       long now = System.currentTimeMillis();
       this.lastQuizAt = now;
-      boolean wasLearned = this.progress.isLearned(question.id());
-      this.progress.answered(question, correct);
-      if (correct && !wasLearned && this.progress.isLearned(question.id())) {
+      boolean mastered = this.progress.answered(question, correct);
+      Consequences.onAnswer(mc, correct);
+      this.speaker.sayNow(question);
+      if (mastered) {
          boolean word = question.action().equals("hold");
          NarratorConfig cfg = ZhNarratorClient.config;
          if (cfg.learnedSound && cfg.learnedSoundVolume > 0.0F) {
@@ -419,13 +423,11 @@ public final class QuizManager {
             }
          }
 
-         this.phrases.fixed(word ? "learned_word" : "learned_phrase").ifPresent(this.speaker::say);
+         this.phrases.fixed(word ? "learned_word" : "learned_phrase").ifPresent(this.speaker::sayPriority);
          NarratorHud.showBanner(question, word, 5000L);
          chat(mc, "§6" + (word ? "New word learned: " : "New phrase learned: ") + "§e" + question.bare() + " §7— " + question.en().replaceAll("[.!]$", ""));
       }
 
-      Consequences.onAnswer(mc, correct);
-      this.speaker.sayNow(question);
       NarratorConfig cfg = ZhNarratorClient.config;
       if (correct) {
          this.wrongStreak = 0;
@@ -437,7 +439,7 @@ public final class QuizManager {
             this.wrongStreak = 0;
             this.angryUntil = now + 8000L;
             Optional<Phrase> angry = this.phrases.fixed("angry");
-            angry.ifPresent(this.speaker::say);
+            angry.ifPresent(this.speaker::sayPriority);
             Consequences.wipeInventory(mc);
             chat(mc, "§c" + angry.map(Phrase::text).orElse("") + " §7The teacher is angry: your inventory is gone.");
          }
@@ -513,63 +515,154 @@ public final class QuizManager {
       }
    }
 
-   private List<QuizManager.Pool> pools(boolean forSpeech) {
-      long now = System.currentTimeMillis();
+   /** Phrases that can be asked in this world (heard here, whole sentences), grouped by word. */
+   private Map<String, List<Phrase>> askableByCard() {
       Progress.World world = this.progress.world();
-      QuizManager.Pool fresh = new QuizManager.Pool(new ArrayList<>(), new ArrayList<>());
-      QuizManager.Pool freshSpeech = new QuizManager.Pool(new ArrayList<>(), new ArrayList<>());
-      List<Phrase> recent = new ArrayList<>();
+      Map<String, List<Phrase>> byCard = new HashMap<>();
 
       for (Phrase p : this.phrases.all()) {
-         int heardTimes = world.heard.getOrDefault(p.id(), 0);
-         if (!PhraseBook.isFragment(p) && heardTimes != 0 && this.progress.restLeft(p.id(), now) <= 0L) {
-            if ((float)this.progress.sinceAskedMs(p.id(), now) < ZhNarratorClient.config.quizRetryAfterSeconds * 1000.0F) {
-               recent.add(p);
-            } else {
-               int asked = this.progress.asked(p.id());
-               int wrong = asked - this.progress.correct(p.id());
-               double w = (1.0 + wrong * 2) / (1.0 + this.progress.correct(p.id())) * Math.min(heardTimes, 5);
-               fresh.phrases().add(p);
-               fresh.weights().add(w);
-               if (speechable(p)) {
-                  freshSpeech.phrases().add(p);
-                  freshSpeech.weights().add(w);
+         if (!PhraseBook.isFragment(p) && world.heard.getOrDefault(p.id(), 0) > 0) {
+            byCard.computeIfAbsent(Progress.cardKey(p), k -> new ArrayList<>()).add(p);
+         }
+      }
+
+      return byCard;
+   }
+
+   /** Adds new words to learn until the configured number is reached, and tells the player about them. */
+   private void fillActive(Map<String, List<Phrase>> askable) {
+      Progress.World world = this.progress.world();
+      Map<String, Integer> heardByCard = new HashMap<>();
+      askable.forEach((key, list) -> {
+         int heard = 0;
+
+         for (Phrase p : list) {
+            heard += world.heard.getOrDefault(p.id(), 0);
+         }
+
+         heardByCard.put(key, heard);
+      });
+
+      for (String key : this.progress.fillActive(heardByCard, Math.max(1, ZhNarratorClient.config.activeWords))) {
+         Phrase shown = this.phrases.fixed("hold." + key).orElse(askable.get(key).getFirst());
+         ZhNarratorClient.LOGGER.info("now learning {} ({})", key, shown.text());
+         Minecraft mc = Minecraft.getInstance();
+         if (mc != null && mc.player != null) {
+            chat(mc, "§b★ New word to learn: §e" + shown.labelWithReading() + " §7— " + shown.en().replaceAll("[.!]$", ""));
+         }
+      }
+   }
+
+   /** Least recently asked phrase of a word, in ms; huge if none was asked yet. */
+   private long sinceAskedCard(List<Phrase> list, long now) {
+      long since = Long.MAX_VALUE;
+
+      for (Phrase p : list) {
+         since = Math.min(since, this.progress.sinceAskedMs(p.id(), now));
+      }
+
+      return since;
+   }
+
+   private boolean hasCandidates() {
+      return this.pick(false) != null;
+   }
+
+   /**
+    * Picks the next question. A review of a mastered word that is due comes first, the most overdue
+    * one. Otherwise one of the words being learned is asked, ones with fewer correct answers in a row
+    * more often, skipping words asked in the last {@code quizRetryAfterSeconds} when possible.
+    */
+   @Nullable
+   private Phrase pick(boolean forSpeech) {
+      long now = System.currentTimeMillis();
+      Map<String, List<Phrase>> askable = this.askableByCard();
+      if (askable.isEmpty()) {
+         return null;
+      } else {
+         this.fillActive(askable);
+         long retryMs = (long)(ZhNarratorClient.config.quizRetryAfterSeconds * 1000.0F);
+         String due = null;
+         long dueAt = Long.MAX_VALUE;
+         List<String> active = new ArrayList<>();
+         List<Double> weights = new ArrayList<>();
+         String stalest = null;
+         long stalestSince = -1L;
+
+         for (Map.Entry<String, List<Phrase>> e : askable.entrySet()) {
+            Progress.Card card = this.progress.card(e.getKey());
+            if (card != null) {
+               if (card.mastered) {
+                  if (card.dueAt <= this.progress.playMs && card.dueAt < dueAt) {
+                     due = e.getKey();
+                     dueAt = card.dueAt;
+                  }
+               } else {
+                  long since = this.sinceAskedCard(e.getValue(), now);
+                  if (since > stalestSince) {
+                     stalest = e.getKey();
+                     stalestSince = since;
+                  }
+
+                  if (since >= retryMs) {
+                     active.add(e.getKey());
+                     weights.add(1.0 / (1.0 + card.streak));
+                  }
                }
+            }
+         }
+
+         String chosen;
+         if (due != null) {
+            chosen = due;
+         } else if (!active.isEmpty()) {
+            chosen = active.getLast();
+            double r = this.random.nextDouble() * weights.stream().mapToDouble(Double::doubleValue).sum();
+
+            for (int i = 0; i < active.size(); i++) {
+               r -= weights.get(i);
+               if (r <= 0.0) {
+                  chosen = active.get(i);
+                  break;
+               }
+            }
+         } else {
+            chosen = stalest;
+         }
+
+         return chosen == null ? null : this.pickPhrase(askable.get(chosen), forSpeech, now);
+      }
+   }
+
+   /** Picks which sentence about the chosen word to ask: rarely asked and often wrong ones first. */
+   private Phrase pickPhrase(List<Phrase> list, boolean forSpeech, long now) {
+      Progress.World world = this.progress.world();
+      long retryMs = (long)(ZhNarratorClient.config.quizRetryAfterSeconds * 1000.0F);
+      QuizManager.Pool fresh = new QuizManager.Pool(new ArrayList<>(), new ArrayList<>());
+      QuizManager.Pool freshSpeech = new QuizManager.Pool(new ArrayList<>(), new ArrayList<>());
+      QuizManager.Pool all = new QuizManager.Pool(new ArrayList<>(), new ArrayList<>());
+
+      for (Phrase p : list) {
+         int asked = this.progress.asked(p.id());
+         int wrong = asked - this.progress.correct(p.id());
+         double w = (1.0 + wrong * 2) / (1.0 + this.progress.correct(p.id())) * Math.min(world.heard.getOrDefault(p.id(), 1), 5);
+         all.phrases().add(p);
+         all.weights().add(w);
+         if (this.progress.sinceAskedMs(p.id(), now) >= retryMs) {
+            fresh.phrases().add(p);
+            fresh.weights().add(w);
+            if (speechable(p)) {
+               freshSpeech.phrases().add(p);
+               freshSpeech.weights().add(w);
             }
          }
       }
 
-      recent.sort(Comparator.<Phrase>comparingLong(px -> this.progress.sinceAskedMs(px.id(), now)).reversed());
-      List<QuizManager.Pool> out = new ArrayList<>();
-      if (forSpeech) {
-         out.add(freshSpeech);
+      if (forSpeech && !freshSpeech.isEmpty()) {
+         return this.pickFrom(freshSpeech);
+      } else {
+         return this.pickFrom(fresh.isEmpty() ? all : fresh);
       }
-
-      out.add(fresh);
-      if (forSpeech) {
-         recent.stream().filter(QuizManager::speechable).findFirst().ifPresent(px -> out.add(new QuizManager.Pool(List.of(px), List.of(1.0))));
-      }
-
-      if (!recent.isEmpty()) {
-         out.add(new QuizManager.Pool(List.of(recent.getFirst()), List.of(1.0)));
-      }
-
-      return out;
-   }
-
-   private boolean hasCandidates() {
-      return this.pools(false).stream().anyMatch(pool -> !pool.isEmpty());
-   }
-
-   @Nullable
-   private Phrase pick(boolean forSpeech) {
-      for (QuizManager.Pool pool : this.pools(forSpeech)) {
-         if (!pool.isEmpty()) {
-            return this.pickFrom(pool);
-         }
-      }
-
-      return null;
    }
 
    private Phrase pickFrom(QuizManager.Pool pool) {

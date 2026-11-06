@@ -59,52 +59,32 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
       this.list
          .addSmall(
             new OptionInstance[]{
-               slider("zhnarrator.options.learned_after", 1.0, 10.0, 1.0, c.learnedAfterCorrect, "", v -> c.learnedAfterCorrect = Math.round(v)),
-               cycle("zhnarrator.options.learned_mode", List.of("until_death", "rest"), c.learnedMode, v -> c.learnedMode = v)
-            }
-         );
-      this.list
-         .addSmall(
-            new OptionInstance[]{
-               slider("zhnarrator.options.learned_rest", 10.0, 240.0, 10.0, c.learnedRestMinutes, " min", v -> c.learnedRestMinutes = v),
-               OptionInstance.createBoolean("zhnarrator.options.mute_learned", c.muteLearned, v -> c.muteLearned = v)
-            }
-         );
-      this.list
-         .addSmall(
-            new OptionInstance[]{
-               slider("zhnarrator.options.quiz_rest", 1.0, 30.0, 1.0, c.quizRepeatAfterMinutes, " min", v -> c.quizRepeatAfterMinutes = v),
+               slider("zhnarrator.options.master_after", 1.0, 5.0, 1.0, c.masterAfterCorrect, "", v -> c.masterAfterCorrect = Math.round(v)),
                slider("zhnarrator.options.retry_after", 0.0, 600.0, 30.0, c.quizRetryAfterSeconds, " s", v -> c.quizRetryAfterSeconds = v)
             }
          );
       this.list
          .addSmall(
             new OptionInstance[]{
-               OptionInstance.createBoolean("zhnarrator.options.rest_after_correct", c.restAfterCorrect, v -> c.restAfterCorrect = v),
-               OptionInstance.createBoolean("zhnarrator.options.quiz_reward", c.quizReward, v -> c.quizReward = v)
+               OptionInstance.createBoolean("zhnarrator.options.quiz_reward", c.quizReward, v -> c.quizReward = v),
+               OptionInstance.createBoolean("zhnarrator.options.quiz_pause", c.quizPauseGame, v -> c.quizPauseGame = v)
             }
          );
       this.list
          .addSmall(
             new OptionInstance[]{
-               OptionInstance.createBoolean("zhnarrator.options.quiz_pause", c.quizPauseGame, v -> c.quizPauseGame = v),
-               OptionInstance.createBoolean("zhnarrator.options.quiz_icons", c.quizShowIcons, v -> c.quizShowIcons = v)
+               OptionInstance.createBoolean("zhnarrator.options.quiz_icons", c.quizShowIcons, v -> c.quizShowIcons = v),
+               slider("zhnarrator.options.angry_after", 0.0, 10.0, 1.0, c.angryAfterWrong, "", v -> c.angryAfterWrong = Math.round(v))
             }
          );
       this.list
          .addSmall(
             new OptionInstance[]{
-               slider("zhnarrator.options.angry_after", 0.0, 10.0, 1.0, c.angryAfterWrong, "", v -> c.angryAfterWrong = Math.round(v)),
-               OptionInstance.createBoolean("zhnarrator.options.learned_sound", c.learnedSound, v -> c.learnedSound = v)
+               OptionInstance.createBoolean("zhnarrator.options.learned_sound", c.learnedSound, v -> c.learnedSound = v),
+               cycle("zhnarrator.options.learned_sound_style", List.of("xp", "fanfare", "soft"), c.learnedSoundStyle, v -> c.learnedSoundStyle = v)
             }
          );
-      this.list
-         .addSmall(
-            new OptionInstance[]{
-               cycle("zhnarrator.options.learned_sound_style", List.of("xp", "fanfare", "soft"), c.learnedSoundStyle, v -> c.learnedSoundStyle = v),
-               percent("zhnarrator.options.learned_sound_volume", c.learnedSoundVolume, v -> c.learnedSoundVolume = v)
-            }
-         );
+      this.list.addBig(percent("zhnarrator.options.learned_sound_volume", c.learnedSoundVolume, v -> c.learnedSoundVolume = v));
       if (iconWords) {
          this.list
             .addSmall(

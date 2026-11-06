@@ -2,3 +2,5 @@ build/
 mod/build/
 mod/.gradle/
 __pycache__/
+mod/logs/
+mod/run/

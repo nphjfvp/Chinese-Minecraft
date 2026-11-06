@@ -26,9 +26,10 @@ public final class CharacterIcons {
          && ZhNarratorClient.phrases.meta().iconWords()) {
          Phrase word = ZhNarratorClient.phrases.forItem("hold", ActionDetector.itemPath(stack)).orElse(null);
          if (word != null && word.key() != null) {
-            int correct = ZhNarratorClient.progress.wordCorrect(word.key());
-            int needed = c.iconMode.equals("known") ? 1 : Math.max(1, c.learnedAfterCorrect);
-            if (correct < needed) {
+            boolean shown = c.iconMode.equals("known")
+               ? ZhNarratorClient.progress.wordCorrect(word.key()) >= 1
+               : ZhNarratorClient.progress.isMastered(word.key());
+            if (!shown) {
                return false;
             } else {
                String text = word.bare();

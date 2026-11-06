@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -21,6 +22,10 @@ public final class Progress {
    public Map<String, Integer> correctTotal = new HashMap<>();
    public Map<String, Long> lastCorrectAt = new HashMap<>();
    public int deaths;
+   /** Learning cards by word (see {@link #cardKey}), shared by all worlds. */
+   public Map<String, Progress.Card> cards = new HashMap<>();
+   /** Time spent playing, in ms. Review intervals count only this time. */
+   public long playMs;
    private transient Progress.World current = new Progress.World();
    private transient Path file;
    private transient boolean dirty;
@@ -54,6 +59,10 @@ public final class Progress {
          p.lastCorrectAt = new HashMap<>();
       }
 
+      if (p.cards == null) {
+         p.cards = new HashMap<>();
+      }
+
       p.current = new Progress.World();
       p.file = file;
       p.lastAskedAt = new HashMap<>();
@@ -76,7 +85,9 @@ public final class Progress {
       this.dirty = true;
    }
 
-   public void answered(Phrase p, boolean correct) {
+   /** Records an answer. Returns true when this answer made the word mastered. */
+   public boolean answered(Phrase p, boolean correct) {
+      boolean mastered = this.updateCard(p, correct);
       int[] stats = this.current.quiz.computeIfAbsent(p.id(), k -> new int[2]);
       stats[0]++;
       this.lastAskedAt.put(p.id(), System.currentTimeMillis());
@@ -88,47 +99,120 @@ public final class Progress {
       }
 
       this.save();
+      return mastered;
+   }
+
+   /** Review intervals in minutes of play time, one per level. */
+   private static final long[] REVIEW_MINUTES = {10L, 30L, 120L, 360L, 1440L, 4320L, 10080L};
+
+   private static long reviewMs(int level) {
+      return REVIEW_MINUTES[Math.min(level, REVIEW_MINUTES.length - 1)] * 60000L;
+   }
+
+   private boolean updateCard(Phrase p, boolean correct) {
+      Progress.Card card = this.cards.get(cardKey(p));
+      if (card == null) {
+         return false;
+      } else if (!card.mastered) {
+         card.streak = correct ? card.streak + 1 : 0;
+         if (card.streak >= Math.max(1, ZhNarratorClient.config.masterAfterCorrect)) {
+            card.mastered = true;
+            card.level = 0;
+            card.dueAt = this.playMs + reviewMs(0);
+            return true;
+         } else {
+            return false;
+         }
+      } else {
+         card.level = correct ? Math.min(card.level + 1, REVIEW_MINUTES.length - 1) : 0;
+         card.dueAt = this.playMs + reviewMs(card.level);
+         return false;
+      }
+   }
+
+   /** The word a phrase teaches: its item, block or creature, or the phrase itself (walk, jump …). */
+   public static String cardKey(Phrase p) {
+      return p.key() != null ? p.key() : p.id();
+   }
+
+   @org.jetbrains.annotations.Nullable
+   public Progress.Card card(String key) {
+      return this.cards.get(key);
+   }
+
+   /** True while the word of this phrase is one of the words being learned right now. */
+   public boolean isActive(Phrase p) {
+      Progress.Card card = this.cards.get(cardKey(p));
+      return card != null && !card.mastered;
+   }
+
+   public boolean isMastered(String key) {
+      Progress.Card card = this.cards.get(key);
+      return card != null && card.mastered;
+   }
+
+   public int masteredCount() {
+      int n = 0;
+
+      for (Progress.Card card : this.cards.values()) {
+         if (card.mastered) {
+            n++;
+         }
+      }
+
+      return n;
+   }
+
+   /**
+    * Tops the words being learned up to {@code limit}. Only words that can be asked in this world
+    * count; new words are the ones heard most often.
+    */
+   public List<String> fillActive(Map<String, Integer> heardByCard, int limit) {
+      int active = 0;
+      List<String> fresh = new java.util.ArrayList<>();
+
+      for (String key : heardByCard.keySet()) {
+         Progress.Card card = this.cards.get(key);
+         if (card == null) {
+            fresh.add(key);
+         } else if (!card.mastered) {
+            active++;
+         }
+      }
+
+      fresh.sort(java.util.Comparator.<String>comparingInt(heardByCard::get).reversed().thenComparing(k -> k));
+      List<String> added = new java.util.ArrayList<>();
+
+      for (String key : fresh) {
+         if (active >= limit) {
+            break;
+         }
+
+         Progress.Card card = new Progress.Card();
+         card.since = this.playMs;
+         this.cards.put(key, card);
+         added.add(key);
+         active++;
+      }
+
+      if (!added.isEmpty()) {
+         this.dirty = true;
+      }
+
+      return added;
+   }
+
+   public void addPlayTime(long ms) {
+      this.playMs += ms;
+      this.dirty = true;
    }
 
    public int correctEver(String id) {
       return this.correct(id);
    }
 
-   public boolean isLearned(String id) {
-      return this.correctEver(id) >= Math.max(1, ZhNarratorClient.config.learnedAfterCorrect);
-   }
-
-   public long restLeft(String id, long now) {
-      Long at = this.lastCorrectAt.get(id);
-      if (at == null) {
-         return 0L;
-      } else {
-         NarratorConfig c = ZhNarratorClient.config;
-         if (this.isLearned(id) && "until_death".equals(c.learnedMode)) {
-            return 4611686018427387903L;
-         } else {
-            float minutes = this.isLearned(id) ? c.learnedRestMinutes : c.quizRepeatAfterMinutes;
-            return Math.max(0L, (long)(minutes * 60000.0F) - (now - at));
-         }
-      }
-   }
-
    public int learnedWords(PhraseBook phrases) {
-      return this.countWords(phrases, Math.max(1, ZhNarratorClient.config.learnedAfterCorrect), Integer.MAX_VALUE);
-   }
-
-   private int countWords(PhraseBook phrases, int minCorrect, int maxCorrect) {
-      Set<String> words = new HashSet<>();
-
-      for (Entry<String, int[]> e : this.current.quiz.entrySet()) {
-         int correct = e.getValue()[1];
-         if (correct >= minCorrect && correct <= maxCorrect) {
-            Phrase p = phrases.fixed(e.getKey()).orElse(null);
-            words.add(p != null && p.key() != null ? p.key() : e.getKey());
-         }
-      }
-
-      return words.size();
+      return this.masteredCount();
    }
 
    public void recordDeath(boolean hardcore) {
@@ -138,15 +222,6 @@ public final class Progress {
       }
 
       this.current.heartsLost = 0;
-      if ("until_death".equals(ZhNarratorClient.config.learnedMode)) {
-         for (int[] stats : this.current.quiz.values()) {
-            stats[1] = 0;
-         }
-
-         this.lastCorrectAt.keySet().removeIf(id -> this.current.quiz.containsKey(id));
-         this.keyCorrect = null;
-      }
-
       this.save();
    }
 
@@ -211,6 +286,19 @@ public final class Progress {
             ZhNarratorClient.LOGGER.warn("Could not write {}: {}", this.file, var6.toString());
          }
       }
+   }
+
+   public static final class Card {
+      /** False while the word is being learned, true once it is only reviewed. */
+      public boolean mastered;
+      /** Correct answers in a row while being learned. */
+      public int streak;
+      /** Review level, an index into the review intervals. */
+      public int level;
+      /** Play time ({@link Progress#playMs}) at which the next review is due. */
+      public long dueAt;
+      /** Play time at which the word started being learned. */
+      public long since;
    }
 
    public static final class World {

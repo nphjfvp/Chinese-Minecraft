@@ -19,6 +19,10 @@ public final class Speaker {
    private final ArrayDeque<Phrase> pendingSounds = new ArrayDeque<>();
    private static final long INTRA_GAP_MS = 60L;
    private static final long JOIN_MS = 40L;
+   /** A sentence waiting longer than this is no longer about what the player is doing: it is dropped. */
+   private static final long FRESH_MS = 2500L;
+   /** How many recent events wait for the next free slot. */
+   private static final int MAX_WAITING = 4;
    private final PhraseBook phrases;
    private final ArrayDeque<Speaker.Queued> queue = new ArrayDeque<>();
    private final Map<String, Long> lastSaid = new HashMap<>();
@@ -47,20 +51,8 @@ public final class Speaker {
          Phrase noun = sounds.getLast();
          Long last = this.lastSaid.get(noun.id());
          if (last == null || !((float)(now - last) < c.sameEventCooldownSeconds * 1000.0F)) {
-            Progress progress = ZhNarratorClient.progress;
-            if ((!c.muteLearned || !progress.isLearned(noun.id())) && (!c.restAfterCorrect || progress.restLeft(noun.id(), now) <= 0L)) {
-               while (this.queue.size() >= Math.max(1, c.maxQueue)) {
-                  Speaker.Queued victim = this.queue.stream().filter(q -> !q.priority()).findFirst().orElse(null);
-                  if (victim == null) {
-                     return;
-                  }
-
-                  this.queue.remove(victim);
-               }
-
-               this.queue.addLast(new Speaker.Queued(display, false, false, sounds));
-               this.lastSaid.put(noun.id(), now);
-            }
+            this.addWaiting(new Speaker.Queued(display, false, false, sounds, now));
+            this.lastSaid.put(noun.id(), now);
          }
       }
    }
@@ -77,6 +69,13 @@ public final class Speaker {
    public void sayNow(Phrase p) {
       if (ZhNarratorClient.config.enabled) {
          this.stop();
+         this.queue.addLast(new Speaker.Queued(p, false, true));
+      }
+   }
+
+   /** Says this right after the current sentence, ignoring the pause between sentences (quiz feedback). */
+   public void sayPriority(Phrase p) {
+      if (ZhNarratorClient.config.enabled) {
          this.queue.addLast(new Speaker.Queued(p, false, true));
       }
    }
@@ -98,25 +97,53 @@ public final class Speaker {
          long now = System.currentTimeMillis();
          Long last = this.lastSaid.get(p.id());
          if (last == null || !((float)(now - last) < c.sameEventCooldownSeconds * 1000.0F)) {
-            Progress progress = ZhNarratorClient.progress;
-            if (!c.muteLearned || !progress.isLearned(p.id())) {
-               if (!c.restAfterCorrect || progress.restLeft(p.id(), now) <= 0L) {
-                  if (!this.queue.stream().anyMatch(q -> q.phrase().id().equals(p.id()))) {
-                     while (this.queue.size() >= Math.max(1, c.maxQueue)) {
-                        Speaker.Queued victim = this.queue.stream().filter(q -> !q.priority()).findFirst().orElse(null);
-                        if (victim == null) {
-                           return;
-                        }
+            this.queue.removeIf(q -> !q.priority() && q.phrase().id().equals(p.id()));
+            this.addWaiting(new Speaker.Queued(p, repeat, false, List.of(p), now));
+            this.lastSaid.put(p.id(), now);
+         }
+      }
+   }
 
-                        this.queue.remove(victim);
-                     }
+   private void addWaiting(Speaker.Queued q) {
+      this.queue.addLast(q);
 
-                     this.queue.addLast(new Speaker.Queued(p, repeat, false));
-                     this.lastSaid.put(p.id(), now);
-                  }
-               }
+      while (this.queue.stream().filter(x -> !x.priority()).count() > MAX_WAITING) {
+         this.queue.stream().filter(x -> !x.priority()).findFirst().ifPresent(this.queue::remove);
+      }
+   }
+
+   /**
+    * The next sentence to say, or null. Quiz feedback goes first. Narration waits for the pause
+    * between sentences; of the events that happened in the last {@link #FRESH_MS} the one heard least
+    * often in this world wins, the newest on a tie, so that over time everything gets said.
+    */
+   @Nullable
+   private Speaker.Queued nextQueued(long now) {
+      for (Speaker.Queued q : this.queue) {
+         if (q.priority()) {
+            this.queue.remove(q);
+            return q;
+         }
+      }
+
+      this.queue.removeIf(q -> now - q.at() > FRESH_MS);
+      if (this.queue.isEmpty() || (float)(now - this.startedAt) < ZhNarratorClient.config.speechGapSeconds * 1000.0F) {
+         return null;
+      } else {
+         Map<String, Integer> heard = ZhNarratorClient.progress.world().heard;
+         Speaker.Queued best = null;
+         int bestHeard = Integer.MAX_VALUE;
+
+         for (Speaker.Queued q : this.queue) {
+            int times = heard.getOrDefault(q.sounds().getFirst().id(), 0);
+            if (times <= bestHeard) {
+               best = q;
+               bestHeard = times;
             }
          }
+
+         this.queue.clear();
+         return best;
       }
    }
 
@@ -140,8 +167,12 @@ public final class Speaker {
       if (this.playing == null && !this.pendingSounds.isEmpty() && now - this.finishedAt >= 60L) {
          this.playClip(mc, this.pendingSounds.pollFirst(), now);
       } else {
-         if (this.playing == null && !questionOpen && !this.queue.isEmpty() && now - Math.max(this.startedAt, this.finishedAt) >= 250L) {
-            Speaker.Queued q = this.queue.pollFirst();
+         Speaker.Queued q;
+         if (this.playing == null
+            && !questionOpen
+            && !this.queue.isEmpty()
+            && now - Math.max(this.startedAt, this.finishedAt) >= 250L
+            && (q = this.nextQueued(now)) != null) {
             this.shown = q.phrase();
             this.startedAt = now;
             this.pendingSounds.clear();
@@ -233,9 +264,9 @@ public final class Speaker {
       return !available.contains(wanted) && !available.isEmpty() ? available.getFirst() : wanted;
    }
 
-   private record Queued(Phrase phrase, boolean repeat, boolean priority, List<Phrase> sounds) {
+   private record Queued(Phrase phrase, boolean repeat, boolean priority, List<Phrase> sounds, long at) {
       Queued(Phrase phrase, boolean repeat, boolean priority) {
-         this(phrase, repeat, priority, List.of(phrase));
+         this(phrase, repeat, priority, List.of(phrase), System.currentTimeMillis());
       }
    }
 }

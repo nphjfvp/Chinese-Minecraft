@@ -59,6 +59,10 @@ public final class NarratorHud {
             Component en = Component.literal(p.en()).withStyle(style);
             boolean showPinyin = p.hasReading() && (c.hudShowPinyin || ZhNarratorClient.keyPinyin != null && ZhNarratorClient.keyPinyin.isDown());
             boolean showEnglish = c.hudShowEnglish && !p.action().equals("hold") && !p.en().equals(p.text());
+            // A star marks sentences about a word the quiz is teaching right now.
+            boolean learning = ZhNarratorClient.progress != null && ZhNarratorClient.progress.isActive(p);
+            Component star = Component.literal("★");
+            int starW = learning ? font.width(star) + 3 : 0;
             float scale = Math.max(0.5F, c.hudScale);
             float small = scale * 0.6F;
             float centerX = g.guiWidth() / 2.0F;
@@ -72,7 +76,7 @@ public final class NarratorHud {
                default -> g.guiHeight() - c.hudOffset - blockHeight;
             };
             if (c.hudBackdrop) {
-               int w = Math.round(font.width(zh) * scale);
+               int w = Math.round((font.width(zh) + 2 * starW) * scale);
                if (showPinyin) {
                   w = Math.max(w, Math.round(font.width(pinyin) * small));
                }
@@ -92,6 +96,10 @@ public final class NarratorHud {
             pose.scale(scale, scale);
             int line = 0;
             drawColoured(g, font, p, style, false, alpha, c);
+            if (learning) {
+               g.text(font, star, -font.width(zh) / 2 - starW, 0, withAlpha(-10944, alpha), c.hudShadow);
+            }
+
             line += 9 + 2;
             pose.popMatrix();
             pose.pushMatrix();
