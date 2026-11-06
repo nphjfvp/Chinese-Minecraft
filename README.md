@@ -36,6 +36,12 @@ Antworten. Abschaltbar unter *No pinyin for mastered words*.
 **Lernübersicht (Taste J).** Drei Spalten: die Wörter, die du gerade lernst, mit ihrer Serie (●○ = 1 von 2 guten
 Runden), die beherrschten Wörter mit der nächsten Wiederholung („due“ = fällig) und der Inhalt des Pfands mit Bildern.
 
+**Satzverlauf (Taste U).** Pausiert das Spiel und zeigt die letzten 40 Sätze der Lehrerin, die neuesten oben, mit
+Pinyin und Englisch. **Fährst du mit der Maus über ein Wort, siehst du seine eigene Übersetzung**, sein Pinyin und
+die Wortart (泥土 ní tǔ: dirt, Nomen; 在 zài: Handlung läuft gerade, Partikel). Mit dem Mausrad geht es zu älteren
+Sätzen. Die Übersetzungen kommen aus den Wörtern der Mod und aus einem kleinen Wörterbuch für Verben, Farben und
+Partikel (`glossary` am Ende von `phrases.json`).
+
 **Fullbright (Taste H).** Alles so hell wie mit Nachtsicht, nur auf deinem Rechner und ohne Effekt. Auch unter
 *Advanced settings* → *Fullbright*.
 
@@ -80,7 +86,7 @@ Wurde nichts gehört, steht dort auch, wie laut es am lautesten war; bei 0 % kom
 **Einstellungen** (Taste I): *Words learned at once* (Wörter gleichzeitig), *Pause between sentences* (Satzpause) und
 *Microphone* stehen im Hauptmenü, *Mastered after N good rounds* (gute Runden bis „beherrscht“), *Angry after N
 failed rounds*, *Death: items to the pledge*, *Listening question*, *Tone question*, *No pinyin for mastered words*
-und *Fullbright* unter *Advanced settings*. Die Tasten (J Übersicht, H Fullbright) lassen sich unter Optionen →
+und *Fullbright* unter *Advanced settings*. Die Tasten (J Übersicht, U Satzverlauf, H Fullbright) lassen sich unter Optionen →
 Steuerung → Tastenbelegung ändern. Die alten Einstellungen „Learned after N correct“, „Learned words“, „Learned rest“, „Never narrate learned
 words“, „Re-ask after“, „Quiet after correct“ und „Angry after N wrong“ gibt es nicht mehr, weil das neue System sie ersetzt.
 
@@ -175,6 +181,7 @@ dekompiliert. Die Namen sind echt, Kommentare gibt es aber keine. Die wichtigste
 | `QuizRound` | Baut die Runde: Hören, Satzanfang, Wort, Ton, ganzer Satz, Sprechen, mit den falschen Antworten. |
 | `Tones` | Pinyin-Töne erkennen und eine Silbe in alle vier Töne setzen. |
 | `LearningScreen` | Die Lernübersicht (Taste J). |
+| `HistoryScreen` | Der Satzverlauf mit Übersetzung beim Überfahren (Taste U). |
 | `mixin/LightmapFullbrightMixin` | Fullbright. |
 | `QuizScreen` | Das Abfragefenster mit den vier Antworten. |
 | `Consequences` | Belohnungen und Strafen (Effekte, wütende Lehrerin) und das Pfand. |

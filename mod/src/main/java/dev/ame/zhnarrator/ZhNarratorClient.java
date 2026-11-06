@@ -54,6 +54,7 @@ public final class ZhNarratorClient {
    public static KeyMapping keyPinyin;
    public static KeyMapping keyTalk;
    public static KeyMapping keyOverview;
+   public static KeyMapping keyHistory;
    private static KeyMapping keyFullbright;
    private static Path configFile;
    private static Path configDir;
@@ -84,9 +85,10 @@ public final class ZhNarratorClient {
       keySpeed = key("speed", 14, category);
       keyReload = key("reload", 12, category);
       keyTalk = key("talk", 5, category);
-      // Key codes are scancodes: 13 is J, 11 is H (G is taken by quick actions).
+      // Key codes are scancodes: 13 is J, 11 is H (G is taken by quick actions), 24 is U.
       keyOverview = key("overview", 13, category);
       keyFullbright = key("fullbright", 11, category);
+      keyHistory = key("history", 24, category);
       return true;
    }
 
@@ -240,6 +242,12 @@ public final class ZhNarratorClient {
          while (keyOverview.consumeClick()) {
             if (mc.player != null) {
                mc.gui.setScreen(new LearningScreen());
+            }
+         }
+
+         while (keyHistory.consumeClick()) {
+            if (mc.player != null) {
+               mc.gui.setScreen(new HistoryScreen());
             }
          }
 

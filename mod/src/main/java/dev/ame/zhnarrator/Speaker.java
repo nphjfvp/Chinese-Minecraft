@@ -26,6 +26,9 @@ public final class Speaker {
    private final PhraseBook phrases;
    private final ArrayDeque<Speaker.Queued> queue = new ArrayDeque<>();
    private final Map<String, Long> lastSaid = new HashMap<>();
+   /** The sentences said lately, newest first, for the sentence history screen. */
+   private final ArrayDeque<Phrase> history = new ArrayDeque<>();
+   private static final int HISTORY = 40;
    @Nullable
    private SoundInstance playing;
    @Nullable
@@ -174,6 +177,7 @@ public final class Speaker {
             && now - Math.max(this.startedAt, this.finishedAt) >= 250L
             && (q = this.nextQueued(now)) != null) {
             this.shown = q.phrase();
+            this.remember(q.phrase());
             this.startedAt = now;
             this.pendingSounds.clear();
             this.pendingSounds.addAll(q.sounds());
@@ -209,6 +213,21 @@ public final class Speaker {
       if (clip.key() != null || !clip.action().endsWith("count")) {
          ZhNarratorClient.progress.heard(clip.id());
       }
+   }
+
+   private void remember(Phrase p) {
+      if (this.history.isEmpty() || !this.history.peekFirst().text().equals(p.text())) {
+         this.history.addFirst(p);
+
+         while (this.history.size() > HISTORY) {
+            this.history.removeLast();
+         }
+      }
+   }
+
+   /** The sentences said lately, newest first. */
+   public List<Phrase> history() {
+      return List.copyOf(this.history);
    }
 
    public boolean isSpeaking() {

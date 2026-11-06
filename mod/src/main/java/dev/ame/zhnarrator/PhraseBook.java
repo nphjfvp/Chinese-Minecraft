@@ -26,6 +26,8 @@ public final class PhraseBook {
    private final List<String> speeds = new ArrayList<>();
    private final Map<String, String> lipsync = new HashMap<>();
    private int lipsyncWindowMs = 40;
+   /** Translations of single words: from the glossary, and from phrases that are one word (泥土 = dirt). */
+   private final Map<String, String> glosses = new HashMap<>();
 
    PhraseBook(LanguagePacks.Meta meta, JsonObject root) {
       this.meta = meta;
@@ -82,6 +84,15 @@ public final class PhraseBook {
 
          Phrase p = new Phrase(o.get("id").getAsString(), o.get("action").getAsString(), key, o.get("text").getAsString(), optional(o, "reading"), en, parts);
          this.phrasesById.put(p.id(), p);
+         if (parts.size() == 1 && !en.isBlank()) {
+            this.glosses.putIfAbsent(glossKey(parts.getFirst().text()), en.replaceAll("[.!]$", ""));
+         }
+      }
+
+      if (root.has("glossary")) {
+         for (Entry<String, JsonElement> e : root.getAsJsonObject("glossary").entrySet()) {
+            this.glosses.put(glossKey(e.getKey()), e.getValue().getAsString());
+         }
       }
    }
 
@@ -120,6 +131,15 @@ public final class PhraseBook {
 
    private static String optional(JsonObject o, String key) {
       return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : "";
+   }
+
+   private static String glossKey(String text) {
+      return text.replaceAll("[，。！？,.!?、]+$", "");
+   }
+
+   /** The translation of one word of a sentence (a part), if known. */
+   public Optional<String> gloss(String part) {
+      return Optional.ofNullable(this.glosses.get(glossKey(part)));
    }
 
    public LanguagePacks.Meta meta() {
