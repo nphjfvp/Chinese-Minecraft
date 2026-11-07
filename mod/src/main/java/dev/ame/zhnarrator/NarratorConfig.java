@@ -89,6 +89,8 @@ public final class NarratorConfig {
    public float dangerDistance = 4.0F;
    /** After danger (a mob close, damage) the quiz waits this long before the next question. */
    public float dangerPauseSeconds = 10.0F;
+   /** Speaking goes in stages: slowly word by word, a bit faster, normal speed (Chinese). */
+   public boolean speakingStages = true;
    public boolean hudEnabled = true;
    public String hudFont = "default";
    public float hudScale = 2.0F;

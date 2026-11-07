@@ -401,6 +401,29 @@ public final class NarratorHud {
             zh = null;
          }
 
+         int stage = quiz.speakStage();
+         Component stageLine = null;
+         Component timeLine = null;
+         if (stage >= 0) {
+            // Speaking in stages: the whole sentence stays on screen; after a take its words turn green or red.
+            zh = resultComponent(q, quiz.wordResults(), Style.EMPTY.withFont(new Resource(fontId())), c.hudColorZh);
+            py = ZhNarratorClient.progress.pinyinHidden(Progress.cardKey(q)) && !quiz.hintNow()
+               ? null
+               : colouredComponent(q, true, Style.EMPTY, c.hudColorPinyin);
+            float target = quiz.stageTargetSeconds();
+            stageLine = Component.translatable("zhnarrator.speak.stage" + stage, new Object[]{String.format(Locale.ROOT, "%.1f", target)})
+               .withStyle(Style.EMPTY.withColor(-14467 & 16777215));
+            float span = quiz.lastSpan();
+            if (span >= 0.0F) {
+               boolean inTime = target <= 0.0F || span <= target;
+               timeLine = Component.translatable(
+                     target > 0.0F ? "zhnarrator.speak.time" : "zhnarrator.speak.time_free",
+                     new Object[]{String.format(Locale.ROOT, "%.1f", span), String.format(Locale.ROOT, "%.1f", target)}
+                  )
+                  .withStyle(Style.EMPTY.withColor(inTime ? 5635925 : 16733525));
+            }
+         }
+
          QuizManager.Phase phase = quiz.phase();
 
          Component status = switch (phase) {
@@ -426,10 +449,11 @@ public final class NarratorHud {
          float pyScale = 1.3F;
          int textW = Math.max(Math.max(font.width(title), font.width(prompt)), Math.max(py == null ? 0 : Math.round(font.width(py) * 1.3F), font.width(status)));
          textW = Math.max(textW, zh == null ? 0 : Math.round(font.width(zh) * 1.3F));
+         textW = Math.max(textW, Math.max(stageLine == null ? 0 : font.width(stageLine), timeLine == null ? 0 : font.width(timeLine)));
          int pad = 12;
          int iconW = icon.isPresent() ? 48 : 0;
          int panelW = pad + iconW + textW + pad;
-         int textH = 20 + (zh != null ? 14 : 0) + (py != null ? 14 : 0) + 3 + 9;
+         int textH = 20 + (zh != null ? 14 : 0) + (py != null ? 14 : 0) + 3 + 9 + (stageLine != null ? 11 : 0) + (timeLine != null ? 11 : 0);
          int panelH = 7 + textH + 7 + 2 + 5;
          int x0 = Math.round(cx - panelW / 2.0F);
          int y0 = 20;
@@ -448,6 +472,11 @@ public final class NarratorHud {
          y += 11;
          g.text(font, prompt, Math.round(tx - font.width(prompt) / 2.0F), y, -8054, true);
          y += 11;
+         if (stageLine != null) {
+            g.text(font, stageLine, Math.round(tx - font.width(stageLine) / 2.0F), y, -1, true);
+            y += 11;
+         }
+
          if (zh != null) {
             Matrix3x2fStack pose = g.pose();
             pose.pushMatrix();
@@ -466,6 +495,11 @@ public final class NarratorHud {
             g.text(font, py, -font.width(py) / 2, 0, -1, true);
             pose.popMatrix();
             y += 14;
+         }
+
+         if (timeLine != null) {
+            g.text(font, timeLine, Math.round(tx - font.width(timeLine) / 2.0F), y, -1, true);
+            y += 11;
          }
 
          y++;
@@ -569,6 +603,25 @@ public final class NarratorHud {
          return out;
       } else {
          return Component.literal(pinyin ? p.reading() : p.text()).withStyle(base.withColor(lift(fallbackColour, lift) & 16777215));
+      }
+   }
+
+   /** The sentence with each word green (said right) or red (not); grammar colours before the first take. */
+   static MutableComponent resultComponent(Phrase p, List<Boolean> results, Style base, int fallbackColour) {
+      if (results.isEmpty() || results.size() != p.parts().size()) {
+         return colouredComponent(p, false, base, fallbackColour);
+      } else {
+         MutableComponent out = Component.empty();
+
+         for (int i = 0; i < p.parts().size(); i++) {
+            out.append(Component.literal(pieceText(p, i, false)).withStyle(base.withColor(results.get(i) ? 5635925 : 16733525)));
+         }
+
+         if (!tail(p).isEmpty()) {
+            out.append(Component.literal(tail(p)).withStyle(base.withColor(16777215)));
+         }
+
+         return out;
       }
    }
 

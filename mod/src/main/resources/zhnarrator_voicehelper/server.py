@@ -7,9 +7,12 @@ Runs next to the game and owns the microphone, so the game itself never asks for
     GET  /health?language=es     -> {"ok": true, "ready": true, "languages": [...], "recording": false}
                                     (asking for a language the helper has not loaded makes it load that model)
     GET  /devices                -> {"devices": ["Headset Microphone", ...], "default": "..."}
-    POST /start  {"device": "Headset Microphone"}
+    POST /start  {"device": "Headset Microphone", "pause": 2.0}
                                  -> starts recording (push-to-talk pressed); the device is optional, a name from
-                                    /devices; without it, or if it is gone, the system's default input is used
+                                    /devices; without it, or if it is gone, the system's default input is used.
+                                    pause: seconds of quiet that end the take (default 0.9; longer for speaking
+                                    slowly, word by word). /stop then also tells "span": seconds from the first
+                                    to the last sound of speech, pauses included
     POST /stop   {"expected": "我在走路。", "language": "zh"}
                                  -> stops, transcribes, compares; {"text", "reading", "pinyin", "confidence",
                                     "seconds", "compare": {...}} (compare only when expected is given)
@@ -104,8 +107,17 @@ class Mic:
         self._silence_s = 0.0
         self.device_name = ""
         self.peak = 0.0
+        self.silence_end_s = self.SILENCE_END_S
+        self._t = 0.0
+        self._first_talk: float | None = None
+        self._last_talk = 0.0
 
-    def start(self, device: str | None = None) -> None:
+    @property
+    def span(self) -> float:
+        """Seconds from the first to the last sound of speech in the take, pauses between words included."""
+        return 0.0 if self._first_talk is None else max(0.0, self._last_talk - self._first_talk)
+
+    def start(self, device: str | None = None, pause: float | None = None) -> None:
         with self.lock:
             if self.stream is not None:
                 return
@@ -113,6 +125,8 @@ class Mic:
             self.done = False
             self._floor, self._floor_frames, self._speech_s, self._silence_s = 0.0, 0, 0.0, 0.0
             self.peak = 0.0
+            self.silence_end_s = pause if pause and pause > 0 else self.SILENCE_END_S
+            self._t, self._first_talk, self._last_talk = 0.0, None, 0.0
             index = resolve_device(device)
             try:
                 self.stream = self._open(index)
@@ -138,6 +152,8 @@ class Mic:
         self.peak = max(self.peak, float(np.max(np.abs(chunk))) if chunk.size else 0.0)
         rms = float(np.sqrt(np.mean(chunk * chunk)))
         seconds = len(chunk) / SAMPLE_RATE
+        start_t = self._t
+        self._t += seconds
         if self._floor_frames < 4:  # the first 0.2 s set the noise floor
             self._floor = max(self._floor, rms)
             self._floor_frames += 1
@@ -146,9 +162,12 @@ class Mic:
         if talking:
             self._speech_s += seconds
             self._silence_s = 0.0
+            if self._first_talk is None:
+                self._first_talk = start_t
+            self._last_talk = start_t + seconds
         elif self._speech_s >= self.SPEECH_MIN_S:
             self._silence_s += seconds
-            if self._silence_s >= self.SILENCE_END_S:
+            if self._silence_s >= self.silence_end_s:
                 self.done = True
 
     def stop(self) -> tuple[np.ndarray, float]:
@@ -287,7 +306,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/start":
                 raw = self._body()
                 body = json.loads(raw.decode("utf-8")) if raw else {}
-                mic.start(body.get("device") or None)
+                mic.start(body.get("device") or None, float(body.get("pause") or 0))
                 log(f"recording from {mic.device_name!r}")
                 self._json(200, {"ok": True, "device": mic.device_name})
             elif url.path == "/stop":
@@ -301,6 +320,7 @@ class Handler(BaseHTTPRequestHandler):
                                          body.get("language") or LANGUAGES[0])
                 result["device"] = mic.device_name
                 result["peak"] = round(mic.peak, 4)
+                result["span"] = round(mic.span, 2)
                 self._json(200, result)
             else:
                 self._json(404, {"error": "unknown endpoint"})

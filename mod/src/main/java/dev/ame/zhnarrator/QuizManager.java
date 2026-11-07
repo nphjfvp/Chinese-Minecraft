@@ -82,6 +82,12 @@ public final class QuizManager {
    private static final long BETWEEN_QUESTIONS_MS = 1500L;
    /** No question before this time: a mob came close or the player got hurt. */
    private long dangerUntil;
+   /** The speaking stage of the open speech question (see {@link SpeakingStages}), or -1 when not staged. */
+   private int speakStage = -1;
+   /** Per word of the sentence: said right or not, from the last take; empty before the first. */
+   private List<Boolean> wordResults = List.of();
+   /** Seconds from the first to the last word of the last take, or -1. */
+   private float lastSpan = -1.0F;
    /** Set from the server thread when the player took real damage (singleplayer). */
    private volatile boolean hurtPending;
 
@@ -245,7 +251,7 @@ public final class QuizManager {
                this.lastStatusPoll = 0L;
                this.helperDone = false;
                this.speaker.stop();
-               this.speech.start().thenAccept(device -> {
+               this.speech.start(this.speakStage == SpeakingStages.SLOW ? SpeakingStages.SLOW_PAUSE_SECONDS : 0.0F).thenAccept(device -> {
                   if (!device.isEmpty()) {
                      this.micName = device;
                   }
@@ -264,7 +270,7 @@ public final class QuizManager {
                this.speech.stop(null, 0.0F);
                this.phase = QuizManager.Phase.WAITING;
                chat(mc, "§7hold the key while you speak");
-            } else if (!down || this.helperDone || now - this.recordingSince > 6000L) {
+            } else if (!down || this.helperDone || now - this.recordingSince > (this.speakStage == SpeakingStages.SLOW ? 15000L : 6000L)) {
                this.phase = QuizManager.Phase.CHECKING;
                this.speech.stop(this.pending.text(), ZhNarratorClient.config.speechPassScore).whenComplete((hx, e) -> {
                   this.heard = hx;
@@ -284,14 +290,32 @@ public final class QuizManager {
                SpeechClient.Heard h = this.heard;
                this.heard = null;
                this.attempts++;
-               boolean ok = h.verdict().equals("exact") || h.verdict().equals("pass");
+               this.showResult(h);
+               boolean said = h.verdict().equals("exact") || h.verdict().equals("pass");
+               boolean ok = this.speechOk(h);
                if (this.bestHeard == null || h.score() > this.bestHeard.score()) {
                   this.bestHeard = h;
                }
 
-               boolean unclear = h.confidence() < 0.45F && !ok;
+               if (ok && this.speakStage >= 0 && this.speakStage < SpeakingStages.NORMAL) {
+                  // Stage done: the same sentence again, a bit faster.
+                  this.progress.reachSpeechStage(this.pending, this.speakStage + 1);
+                  this.speakStage++;
+                  chat(mc, heardLine(h) + "  §a✓ " + (this.speakStage == SpeakingStages.FASTER ? "now a bit faster" : "now at normal speed"));
+                  this.attempts = 0;
+                  this.bestHeard = null;
+                  this.deadline = now + (long)(ZhNarratorClient.config.quizAnswerSeconds * 1500.0F);
+                  this.deadlineTotalMs = this.deadline - now;
+                  this.phase = QuizManager.Phase.WAITING;
+                  break;
+               }
+
+               boolean unclear = h.confidence() < 0.45F && !said;
+               String why = said && !ok
+                  ? String.format(java.util.Locale.ROOT, "  §7too slow: %.1f s, aim for %.1f s", h.span(), this.stageTargetSeconds())
+                  : (unclear ? "  §7unclear, say it again" : "  §7try again");
                if (!ok && this.attempts < 3 && now < this.deadline - 3000L) {
-                  chat(mc, heardLine(h) + (unclear ? "  §7unclear, say it again" : "  §7try again"));
+                  chat(mc, heardLine(h) + why);
                   this.hintNow = true;
                   this.phase = QuizManager.Phase.WAITING;
                } else {
@@ -309,7 +333,8 @@ public final class QuizManager {
       this.heard = null;
       this.heardError = null;
       this.bestHeard = null;
-      boolean ok = h != null && (h.verdict().equals("exact") || h.verdict().equals("pass"));
+      boolean ok = h != null && this.speechOk(h);
+      this.speakStage = -1;
       chat(mc, h != null && !h.silent() ? heardLine(h) : "§7(nothing heard" + micHint(h) + ")");
       if (h != null && !h.silent() && question != null && ZhNarratorClient.phrases != null && ZhNarratorClient.phrases.meta().language().equals("zh")) {
          this.progress.toneResult(question, h.toneErrors() == 0);
@@ -317,6 +342,42 @@ public final class QuizManager {
       if (question != null) {
          this.answer(mc, question, ok);
       }
+   }
+
+   /** Right words, and at the slower stages done, fast enough for the stage. */
+   private boolean speechOk(SpeechClient.Heard h) {
+      boolean said = h.verdict().equals("exact") || h.verdict().equals("pass");
+      return said && (this.speakStage < 0 || SpeakingStages.fastEnough(this.speakStage, h.span(), this.clipMs("normal"), this.clipMs("slow")));
+   }
+
+   private void showResult(SpeechClient.Heard h) {
+      this.wordResults = this.pending == null ? List.of() : SpeakingStages.wordResults(this.pending, h.perSyllable());
+      this.lastSpan = h.span();
+   }
+
+   /** How long the teacher's recording of the open sentence speaks at this speed, in ms, or -1. */
+   private long clipMs(String speed) {
+      return this.pending == null || !this.phrases.speeds().contains(speed)
+         ? -1L
+         : this.phrases.spokenMs(this.pending.soundPath(this.speaker.voice(), speed));
+   }
+
+   /** The open speech question's stage: 0 slowly, 1 faster, 2 normal; -1 when not staged. */
+   public int speakStage() {
+      return this.speakStage;
+   }
+
+   public List<Boolean> wordResults() {
+      return this.wordResults;
+   }
+
+   public float lastSpan() {
+      return this.lastSpan;
+   }
+
+   /** The time limit of the current stage in seconds; 0 for none. */
+   public float stageTargetSeconds() {
+      return this.speakStage < 0 ? 0.0F : SpeakingStages.targetSeconds(this.speakStage, this.clipMs("normal"), this.clipMs("slow"));
    }
 
    /** Which microphone recorded and how loud it got, to find out why nothing was heard. */
@@ -445,6 +506,10 @@ public final class QuizManager {
             this.heardError = null;
             this.bestHeard = null;
             this.attempts = 0;
+            boolean staged = ZhNarratorClient.config.speakingStages && this.phrases.meta().language().equals("zh");
+            this.speakStage = staged ? this.progress.speechStage(q.question()) : -1;
+            this.wordResults = List.of();
+            this.lastSpan = -1.0F;
             ZhNarratorClient.LOGGER.info("quiz ask (speech) {} | {}", q.question().id(), q.question().en());
          } else {
             ZhNarratorClient.LOGGER.info("quiz ask {} {} | {}", new Object[]{q.step(), q.question().id(), q.question().text()});
@@ -455,6 +520,7 @@ public final class QuizManager {
 
    private void endRound(long now) {
       this.round = null;
+      this.speakStage = -1;
       this.pending = null;
       this.phase = QuizManager.Phase.NONE;
       this.lastQuizAt = now;

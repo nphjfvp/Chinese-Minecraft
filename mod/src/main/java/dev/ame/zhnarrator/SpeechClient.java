@@ -79,7 +79,16 @@ public final class SpeechClient {
 
    /** Starts recording from the microphone chosen in the settings; completes with the device's name, "" on failure. */
    public CompletableFuture<String> start() {
+      return this.start(0.0F);
+   }
+
+   /** As {@link #start()}; {@code pauseSeconds} of quiet end the take (0: the helper's default). */
+   public CompletableFuture<String> start(float pauseSeconds) {
       JsonObject body = new JsonObject();
+      if (pauseSeconds > 0.0F) {
+         body.addProperty("pause", pauseSeconds);
+      }
+
       String device = ZhNarratorClient.config.microphone;
       if (device != null && !device.isEmpty()) {
          body.addProperty("device", device);
@@ -145,6 +154,11 @@ public final class SpeechClient {
                      o.getAsJsonArray(readingKey).forEach(s -> reading.append(reading.isEmpty() ? "" : " ").append(s.getAsString()));
                   }
 
+                  List<Float> perSyllable = new ArrayList<>();
+                  if (cmp != null && cmp.has("per_syllable") && cmp.get("per_syllable").isJsonArray()) {
+                     cmp.getAsJsonArray("per_syllable").forEach(e -> perSyllable.add(e.getAsFloat()));
+                  }
+
                   return new SpeechClient.Heard(
                      o.get("text").getAsString(),
                      reading.toString(),
@@ -155,7 +169,9 @@ public final class SpeechClient {
                      cmp == null ? 99 : cmp.get("syllable_errors").getAsInt(),
                      cmp == null ? 0 : cmp.get("tone_errors").getAsInt(),
                      o.has("device") ? o.get("device").getAsString() : "",
-                     o.has("peak") ? o.get("peak").getAsFloat() : -1.0F
+                     o.has("peak") ? o.get("peak").getAsFloat() : -1.0F,
+                     perSyllable,
+                     o.has("span") ? o.get("span").getAsFloat() : -1.0F
                   );
                }
             }
@@ -172,7 +188,9 @@ public final class SpeechClient {
       int syllableErrors,
       int toneErrors,
       String device,
-      float peak
+      float peak,
+      List<Float> perSyllable,
+      float span
    ) {
    }
 }

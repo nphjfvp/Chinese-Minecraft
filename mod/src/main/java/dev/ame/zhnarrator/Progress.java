@@ -168,6 +168,21 @@ public final class Progress {
       }
    }
 
+   /** The speaking stage to start at for this sentence's word. */
+   public int speechStage(Phrase p) {
+      Progress.Card card = this.cards().get(cardKey(p));
+      return card == null ? 0 : Math.max(0, Math.min(2, card.speechStage));
+   }
+
+   /** Remembers that the word's sentence was spoken well at this stage. */
+   public void reachSpeechStage(Phrase p, int stage) {
+      Progress.Card card = this.cards().get(cardKey(p));
+      if (card != null && stage > card.speechStage) {
+         card.speechStage = Math.min(2, stage);
+         this.dirty = true;
+      }
+   }
+
    /** Whether this world continues the learning of the other worlds (or starts from zero). */
    public boolean sharedLearning() {
       return !OWN.equals(this.current.learning);
@@ -407,6 +422,8 @@ public final class Progress {
       public long since;
       /** Recent wrong tones, 0–5: in the tone question or when speaking. */
       public int toneTrouble;
+      /** Speaking stage this word's sentences reached: 0 slowly, 1 a bit faster, 2 normal speed. */
+      public int speechStage;
    }
 
    public static final class World {

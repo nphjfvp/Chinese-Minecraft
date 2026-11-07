@@ -77,6 +77,7 @@ public final class NarratorAdvancedScreen extends NarratorSettingsScreen {
                OptionInstance.createBoolean("zhnarrator.options.quiz_tones", c.quizTones, v -> c.quizTones = v)
             }
          );
+      this.list.addBig(OptionInstance.createBoolean("zhnarrator.options.speaking_stages", c.speakingStages, v -> c.speakingStages = v));
       this.list
          .addSmall(
             new OptionInstance[]{

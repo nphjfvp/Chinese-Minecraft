@@ -25,6 +25,25 @@ Fehlt einem Satz ein Teil (etwa „下雨了“, der mit dem Verb beginnt), fäl
 Effekt**: positiv bei richtig, negativ bei falsch. Hör- und Tonfrage lassen sich unter *Advanced settings* abschalten
 (*Listening question*, *Tone question*), falls dir die Runden zu lang sind.
 
+**Sprechen in drei Stufen.** Die Sprechfrage zeigt den ganzen Satz (mit Pinyin, solange es für das Wort noch
+angezeigt wird):
+
+1. **Langsam, Wort für Wort.** Keine Zeitgrenze; Pausen zwischen den Wörtern bis 2,5 Sekunden sind erlaubt.
+2. **Etwas schneller.** Der Satz muss in eine Zeitgrenze passen, gemessen vom ersten bis zum letzten Wort.
+3. **Normale Geschwindigkeit.** Knapp so schnell wie die Lehrerin (bei 我在挖泥土: höchstens 2,2 s statt 1,2 s).
+
+Nach jedem Versuch färbt sich oben **jedes Wort grün (richtig) oder rot (falsch)**, und darunter steht deine Zeit
+neben der Grenze. Ist eine Stufe geschafft, kommt derselbe Satz gleich in der nächsten Stufe. Jedes Wort merkt sich die
+erreichte Stufe; beim nächsten Mal geht es dort weiter. Abschaltbar unter *Advanced settings* → *Speak in stages*.
+
+**Anki-Export.** In der Lernübersicht (Taste J) gibt es unten den Knopf **Export to Anki**. Er schreibt alle Wörter, die
+du lernst oder beherrschst, als Karten nach `.minecraft/learn-or-die/anki/`: vorne das Wort in Schriftzeichen mit
+Aufnahme, hinten Pinyin, Englisch und ein Satz, den du im Spiel gehört hast, ebenfalls mit Aufnahme. Findet die Mod
+genau ein Anki-Profil auf dem Rechner, kopiert sie die Aufnahmen gleich dorthin; sonst kopierst du den Ordner `media`
+selbst in `collection.media` (steht in `README.txt` im Export-Ordner). Dann in Anki *Datei → Importieren →*
+`learn-or-die-chinese.txt`. Die Karten landen im Stapel „Learn or Die::Chinese“; erneutes Exportieren und Importieren
+aktualisiert sie, statt doppelte anzulegen.
+
 **Töne.** Wörter, bei denen du Töne falsch wählst oder falsch sprichst (der Sprachtest erkennt Tonfehler), kommen
 unter den aktiven Wörtern häufiger dran. Bei beherrschten Wörtern rücken die Wiederholungen nicht weiter auseinander,
 solange die Töne noch wackeln. In der Lernübersicht sind solche Wörter mit **♪** markiert.
@@ -205,6 +224,8 @@ dekompiliert. Die Namen sind echt, Kommentare gibt es aber keine. Die wichtigste
 | `Tones` | Pinyin-Töne erkennen und eine Silbe in alle vier Töne setzen. |
 | `LearningScreen` | Die Lernübersicht (Taste J). |
 | `HistoryScreen` | Der Satzverlauf mit Übersetzung beim Überfahren (Taste U). |
+| `SpeakingStages` | Die drei Sprechstufen: Wörter richtig/falsch, Zeitgrenzen. |
+| `AnkiExport` | Der Anki-Export. |
 | `mixin/LightmapFullbrightMixin` | Fullbright. |
 | `QuizScreen` | Das Abfragefenster mit den vier Antworten. |
 | `Consequences` | Belohnungen und Strafen (Effekte, wütende Lehrerin) und das Pfand. |

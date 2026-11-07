@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
@@ -43,6 +44,11 @@ public final class LearningScreen extends Screen {
          (e.getValue().mastered ? this.mastered : this.active).add(e);
       }
 
+      this.addRenderableWidget(
+         Button.builder(Component.translatable("zhnarrator.options.anki_export"), b -> AnkiExport.exportNow(this.minecraft))
+            .bounds(this.width / 2 - 70, this.height - 26, 140, 20)
+            .build()
+      );
       this.active.sort(Comparator.comparingLong(e -> e.getValue().since));
       this.mastered.sort(Comparator.comparingLong(e -> e.getValue().dueAt));
       this.pledge.clear();
@@ -73,7 +79,7 @@ public final class LearningScreen extends Screen {
       int gap = 10;
       int colW = Math.max(120, (this.width - 2 * 16 - 2 * gap) / 3);
       int top = 34;
-      int bottom = this.height - 12;
+      int bottom = this.height - 32;
       int x0 = (this.width - (3 * colW + 2 * gap)) / 2;
       g.centeredText(this.font, this.title.getString(), this.width / 2, 8, GOLD);
       g.centeredText(
